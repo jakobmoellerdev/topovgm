@@ -23,7 +23,9 @@ import (
 
 // VolumeGroupSpec defines the desired state of VolumeGroup
 type VolumeGroupSpec struct {
-	NodeName   string  `json:"nodeName"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the node cannot be changed once set"
+	NodeName string `json:"nodeName"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the name on the node cannot be changed once set"
 	NameOnNode *string `json:"nameOnNode,omitempty"`
 
 	PVs []string `json:"pvs"`
@@ -33,16 +35,21 @@ type VolumeGroupSpec struct {
 
 	Tags []string `json:"tags,omitempty"`
 
-	MaximumLogicalVolumes  *int `json:"maximumLogicalVolumes,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the maximum amount of logical volumes cannot be changed once set"
+	MaximumLogicalVolumes *int `json:"maximumLogicalVolumes,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the maximum amount of physical volumes cannot be changed once set"
 	MaximumPhysicalVolumes *int `json:"maximumPhysicalVolumes,omitempty"`
 
 	PhysicalExtentSize *resource.Quantity `json:"physicalExtentSize,omitempty"`
 
 	AllocationPolicy *string `json:"allocationPolicy,omitempty"`
 
-	DataAlignment       *resource.Quantity `json:"dataAlignment,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the data alignment cannot be changed once set"
+	DataAlignment *resource.Quantity `json:"dataAlignment,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the data alignment offset cannot be changed once set"
 	DataAlignmentOffset *resource.Quantity `json:"dataAlignmentOffset,omitempty"`
 
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="zeroing cannot be changed once set"
 	Zero           *bool `json:"zero,omitempty"`
 	AutoActivation *bool `json:"autoActivation,omitempty"`
 }

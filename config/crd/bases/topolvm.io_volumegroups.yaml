@@ -49,12 +49,18 @@ spec:
                 - type: string
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+                x-kubernetes-validations:
+                - message: the data alignment cannot be changed once set
+                  rule: self == oldSelf
               dataAlignmentOffset:
                 anyOf:
                 - type: integer
                 - type: string
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+                x-kubernetes-validations:
+                - message: the data alignment offset cannot be changed once set
+                  rule: self == oldSelf
               devices:
                 items:
                   type: string
@@ -63,12 +69,26 @@ spec:
                 type: string
               maximumLogicalVolumes:
                 type: integer
+                x-kubernetes-validations:
+                - message: the maximum amount of logical volumes cannot be changed
+                    once set
+                  rule: self == oldSelf
               maximumPhysicalVolumes:
                 type: integer
+                x-kubernetes-validations:
+                - message: the maximum amount of physical volumes cannot be changed
+                    once set
+                  rule: self == oldSelf
               nameOnNode:
                 type: string
+                x-kubernetes-validations:
+                - message: the name on the node cannot be changed once set
+                  rule: self == oldSelf
               nodeName:
                 type: string
+                x-kubernetes-validations:
+                - message: the node cannot be changed once set
+                  rule: self == oldSelf
               physicalExtentSize:
                 anyOf:
                 - type: integer
@@ -85,6 +105,9 @@ spec:
                 type: array
               zero:
                 type: boolean
+                x-kubernetes-validations:
+                - message: zeroing cannot be changed once set
+                  rule: self == oldSelf
             required:
             - nodeName
             - pvs
