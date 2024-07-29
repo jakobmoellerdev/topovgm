@@ -4,6 +4,10 @@ metadata:
   labels:
     app.kubernetes.io/name: topovgm
     app.kubernetes.io/managed-by: kustomize
-  name: volumegroup-sample
+  name: vg1
 spec:
-  # TODO(user): Add fields here
+  nodeName: crc
+  tags:
+    - topovgm
+  pvs:
+    - /dev/loop0

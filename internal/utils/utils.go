@@ -7,6 +7,13 @@ package utils
 // b := []string{"b", "c", "d"}
 // InLeftButNotInRight(a, b) == []string{"a"}
 func InLeftButNotInRight[T comparable](left, right []T) []T {
+	if len(left) == 0 {
+		return nil
+	}
+	if len(right) == 0 {
+		return left
+	}
+
 	m := make(map[T]struct{}, len(right))
 	for _, x := range right {
 		m[x] = struct{}{}

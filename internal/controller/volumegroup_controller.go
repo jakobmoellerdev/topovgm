@@ -102,6 +102,10 @@ func (r *VolumeGroupReconciler) reconcile(ctx context.Context, vg *v1alpha1.Volu
 		return nil
 	}
 
+	if err != nil {
+		return r.updateStatus(ctx, vg, err)
+	}
+
 	if err := r.sync(ctx, vg, lvmvg); err != nil {
 		return fmt.Errorf("failed to sync: %w", err)
 	}
