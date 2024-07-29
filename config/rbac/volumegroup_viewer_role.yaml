@@ -1,0 +1,23 @@
+# permissions for end users to view volumegroups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: topovgm
+    app.kubernetes.io/managed-by: kustomize
+  name: volumegroup-viewer-role
+rules:
+- apiGroups:
+  - topolvm.io
+  resources:
+  - volumegroups
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - topolvm.io
+  resources:
+  - volumegroups/status
+  verbs:
+  - get
