@@ -17,25 +17,67 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // VolumeGroupSpec defines the desired state of VolumeGroup
 type VolumeGroupSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	NodeName   string  `json:"nodeName"`
+	NameOnNode *string `json:"nameOnNode,omitempty"`
 
-	// Foo is an example field of VolumeGroup. Edit volumegroup_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	PVs []string `json:"pvs"`
+
+	Devices     []string `json:"devices,omitempty"`
+	DevicesFile *string  `json:"devicesFile,omitempty"`
+
+	Tags []string `json:"tags,omitempty"`
+
+	MaximumLogicalVolumes  *int `json:"maximumLogicalVolumes,omitempty"`
+	MaximumPhysicalVolumes *int `json:"maximumPhysicalVolumes,omitempty"`
+
+	PhysicalExtentSize *resource.Quantity `json:"physicalExtentSize,omitempty"`
+
+	AllocationPolicy *string `json:"allocationPolicy,omitempty"`
+
+	DataAlignment       *resource.Quantity `json:"dataAlignment,omitempty"`
+	DataAlignmentOffset *resource.Quantity `json:"dataAlignmentOffset,omitempty"`
+
+	Zero           *bool `json:"zero,omitempty"`
+	AutoActivation *bool `json:"autoActivation,omitempty"`
 }
 
 // VolumeGroupStatus defines the observed state of VolumeGroup
 type VolumeGroupStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Name  string `json:"name"`
+	UUID  string `json:"uuid,omitempty"`
+	SysID string `json:"sysid,omitempty"`
+
+	VGAttributes string   `json:"attr,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+
+	ExtentSize  *resource.Quantity `json:"extentSize,omitempty"`
+	ExtentCount int64              `json:"extentCount,omitempty"`
+
+	SeqNo int64 `json:"seqno,omitempty"`
+
+	Size *resource.Quantity `json:"size,omitempty"`
+	Free *resource.Quantity `json:"free,omitempty"`
+
+	PvCount        int64 `json:"count,omitempty"`
+	MissingPVCount int64 `json:"missingPvCount,omitempty"`
+	MaxPv          int64 `json:"maxPv,omitempty"`
+
+	LvCount int64 `json:"lvCount,omitempty"`
+	MaxLv   int64 `json:"maxLv,omitempty"`
+
+	SnapCount int64 `json:"snapCount,omitempty"`
+
+	MDACount     int64 `json:"mdaCount,omitempty"`
+	MDAUsedCount int64 `json:"mdaUsedCount,omitempty"`
+	MDACopies    int64 `json:"mdaCopies,omitempty"`
+
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -137,4 +138,16 @@ func GetProjectDir() (string, error) {
 	}
 	wd = strings.Replace(wd, "/test/e2e", "", -1)
 	return wd, nil
+}
+
+var skipRootfulTests = flag.Bool("skip-rootful-tests", false, "Name of location to greet")
+
+func AbortOrSkipTestIfNotRoot() {
+	if os.Geteuid() != 0 {
+		if *skipRootfulTests {
+			Skip("Skipping test because it requires root privileges to setup its environment.")
+		} else {
+			AbortSuite("Aborting test suite because it requires root privileges to setup its environment.")
+		}
+	}
 }

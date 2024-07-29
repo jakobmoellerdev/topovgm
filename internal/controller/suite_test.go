@@ -18,13 +18,15 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	"github.com/topolvm/topovgm/test/utils"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,7 +52,9 @@ func TestControllers(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(logger)
+	slog.SetDefault(slog.New(logr.ToSlogHandler(logger)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -65,6 +69,8 @@ var _ = BeforeSuite(func() {
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
 			fmt.Sprintf("1.30.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
+
+	utils.AbortOrSkipTestIfNotRoot()
 
 	var err error
 	// cfg is defined in this file globally.

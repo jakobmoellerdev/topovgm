@@ -27,7 +27,7 @@ import (
 	"github.com/topolvm/topovgm/test/utils"
 )
 
-const namespace = "topovgm-system"
+const namespace = "topolvm-system"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {

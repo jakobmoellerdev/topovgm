@@ -55,14 +55,19 @@ spec:
         # More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
         # Please uncomment the following code if your project does NOT have to work on old Kubernetes
         # versions < 1.19 or on vendors versions which do NOT support this field by default (i.e. Openshift < 4.11 ).
-        # seccompProfile:
-        #   type: RuntimeDefault
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - command:
         - /manager
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         image: controller:latest
         name: manager
         securityContext:
@@ -86,10 +91,10 @@ spec:
         # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         resources:
           limits:
-            cpu: 500m
+            cpu: 100m
             memory: 128Mi
           requests:
-            cpu: 10m
+            cpu: 5m
             memory: 64Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
