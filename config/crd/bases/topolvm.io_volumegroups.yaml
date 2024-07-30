@@ -95,6 +95,121 @@ spec:
                 - type: string
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+              pvSelector:
+                description: |-
+                  PVSelector represents the union of the results of one or more queries
+                  over a set of physical volume candidates; that is, it represents the OR of the selectors represented
+                  by the pv selector terms.
+                properties:
+                  pvSelectorTerms:
+                    description: Required. A list of node selector terms. The terms
+                      are ORed.
+                    items:
+                      description: |-
+                        A null or empty pv selector term matches no objects. The requirements of
+                        them are ANDed.
+                        The TopologySelectorTerm type implements a subset of the PVSelectorTerm.
+                      properties:
+                        matchLSBLK:
+                          description: A list of node selector requirements by node's
+                            labels.
+                          items:
+                            description: |-
+                              LSBLKSelectorRequirement is a selector that contains values, a key, and an operator
+                              that relates the key and values.
+                            properties:
+                              key:
+                                description: The label key that the selector applies
+                                  to.
+                                enum:
+                                - NAME
+                                - KNAME
+                                - PATH
+                                - MAJ:MIN
+                                - FSAVAIL
+                                - FSSIZE
+                                - FSTYPE
+                                - FSUSED
+                                - FSUSE%
+                                - FSROOTS
+                                - FSVER
+                                - MOUNTPOINT
+                                - MOUNTPOINTS
+                                - LABEL
+                                - UUID
+                                - PTUUID
+                                - PTTYPE
+                                - PARTTYPE
+                                - PARTTYPENAME
+                                - PARTLABEL
+                                - PARTUUID
+                                - PARTFLAGS
+                                - RA
+                                - RO
+                                - RM
+                                - HOTPLUG
+                                - MODEL
+                                - SERIAL
+                                - SIZE
+                                - STATE
+                                - OWNER
+                                - GROUP
+                                - MODE
+                                - ALIGNMENT
+                                - MIN-IO
+                                - OPT-IO
+                                - PHY-SEC
+                                - LOG-SEC
+                                - ROTA
+                                - SCHED
+                                - RQ-SIZE
+                                - TYPE
+                                - DISC-ALN
+                                - DISC-GRAN
+                                - DISC-MAX
+                                - DISC-ZERO
+                                - WSAME
+                                - WWN
+                                - RAND
+                                - PKNAME
+                                - HCTL
+                                - TRAN
+                                - SUBSYSTEMS
+                                - REV
+                                - VENDOR
+                                - ZONED
+                                - DAX
+                                type: string
+                              operator:
+                                description: |-
+                                  Represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                type: string
+                              values:
+                                description: |-
+                                  An array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. If the operator is Gt or Lt, the values
+                                  array must have a single element, which will be interpreted as a resource.Quantity.
+                                  This array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
+                    x-kubernetes-list-type: atomic
+                required:
+                - pvSelectorTerms
+                type: object
+                x-kubernetes-map-type: atomic
               pvs:
                 items:
                   type: string
@@ -110,12 +225,11 @@ spec:
                   rule: self == oldSelf
             required:
             - nodeName
-            - pvs
             type: object
           status:
             description: VolumeGroupStatus defines the observed state of VolumeGroup
             properties:
-              attr:
+              attributes:
                 type: string
               conditions:
                 items:
@@ -186,9 +300,6 @@ spec:
                   - type
                   type: object
                 type: array
-              count:
-                format: int64
-                type: integer
               extentCount:
                 format: int64
                 type: integer
@@ -227,6 +338,9 @@ spec:
                 type: integer
               name:
                 type: string
+              pvCount:
+                format: int64
+                type: integer
               pvs:
                 items:
                   type: string

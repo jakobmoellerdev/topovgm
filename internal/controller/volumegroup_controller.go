@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jakobmoellerdev/lvm2go"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,9 +39,10 @@ const (
 // VolumeGroupReconciler reconciles a VolumeGroup object
 type VolumeGroupReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	LVM      lvm2go.Client
-	NodeName string
+	Scheme       *runtime.Scheme
+	LVM          lvm2go.Client
+	NodeName     string
+	SyncInterval time.Duration
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -73,34 +75,39 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	return ctrl.Result{}, r.reconcile(ctx, vg)
-}
-
-func (r *VolumeGroupReconciler) reconcile(ctx context.Context, vg *v1alpha1.VolumeGroup) error {
 	name := nameOnNode(vg)
+	logger = logger.WithValues("node", r.NodeName, "lvm_name", name)
 
 	if !vg.GetDeletionTimestamp().IsZero() {
+		logger.V(1).Info("removing volume group from host")
 		if err := r.LVM.VGRemove(ctx, name); err != nil && !lvm2go.IsLVMNotFound(err) {
-			return fmt.Errorf("failed to remove volume group: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to remove volume group: %w", err)
 		}
 		if updated := controllerutil.RemoveFinalizer(vg, VolumeGroupFinalizer); updated {
-			return r.Update(ctx, vg)
+			return ctrl.Result{}, r.Update(ctx, vg)
 		}
-		return nil
+		return ctrl.Result{Requeue: true}, nil
 	}
 
-	lvm, err := r.LVM.VG(ctx, name)
+	logger.V(1).Info("syncing volume group with host, starting host discovery")
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	lvm, err := r.LVM.VG(ctx, name, lvm2go.UnitBytes)
+
+	logger.V(1).Info("host discovery completed", "duration", time.Since(start))
 
 	if errors.Is(err, lvm2go.ErrVolumeGroupNotFound) {
 		err = r.initializeVG(ctx, vg)
 	}
 
 	if err != nil {
-		return r.Client.Status().Update(ctx, vg)
+		return ctrl.Result{}, errors.Join(err, r.Client.Status().Update(ctx, vg))
 	}
 
 	if updated := controllerutil.AddFinalizer(vg, VolumeGroupFinalizer); updated {
-		return r.Update(ctx, vg)
+		return ctrl.Result{Requeue: true}, r.Update(ctx, vg)
 	}
 
 	if err = r.sync(ctx, vg, lvm); err != nil {
@@ -109,13 +116,25 @@ func (r *VolumeGroupReconciler) reconcile(ctx context.Context, vg *v1alpha1.Volu
 
 	if statusErr := r.syncStatus(ctx, vg, lvm); statusErr != nil {
 		err = errors.Join(err, fmt.Errorf("failed to sync status from lvm2 into volume group: %w", statusErr))
+	} else {
+		logger.V(1).Info("status refreshed successfully")
 	}
 
-	return errors.Join(err, r.Client.Status().Update(ctx, vg))
+	if err := errors.Join(err, r.Client.Status().Update(ctx, vg)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: r.SyncInterval}, nil
 }
 
 func (r *VolumeGroupReconciler) initializeVG(ctx context.Context, vg *v1alpha1.VolumeGroup) error {
-	opts, err := convertToVGCreateOptions(vg)
+	start := time.Now()
+	log.FromContext(ctx).Info("creating volume group on host")
+	defer func() {
+		log.FromContext(ctx).Info("finished creating volume group on host", "duration", time.Since(start))
+	}()
+
+	opts, err := convertToVGCreateOptions(ctx, vg)
 	if err != nil {
 		return fmt.Errorf("failed to convert VolumeGroup to VGCreateOptions: %w", err)
 	}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jakobmoellerdev/lvm2go"
 	"github.com/topolvm/topovgm/api/v1alpha1"
 	"github.com/topolvm/topovgm/internal/utils"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // sync synchronizes the desired state of the volume group with the actual state from lvm2.
@@ -22,6 +24,14 @@ func (r *VolumeGroupReconciler) sync(
 		r.syncTags,
 		r.syncPVs,
 	}
+
+	logger := log.FromContext(ctx).WithValues("vg", vg.Name)
+
+	start := time.Now()
+	logger.V(1).Info("syncing volume group")
+	defer func() {
+		logger.V(1).Info("finished syncing volume group", "duration", time.Since(start))
+	}()
 
 	errs := make([]error, 0, len(syncers))
 	for _, sync := range syncers {
@@ -66,18 +76,22 @@ func (r *VolumeGroupReconciler) syncPVs(
 ) error {
 	name := nameOnNode(vg)
 
-	pvs, err := r.LVM.PVs(ctx, lvm.Name)
+	desiredState, err := pvsFromSpec(ctx, vg)
+	if err != nil {
+		return fmt.Errorf("could not get physical volume names to sync spec: %w", err)
+	}
+
+	pvs, err := r.LVM.PVs(ctx, lvm.Name, lvm2go.UnitBytes)
 	if err != nil {
 		return fmt.Errorf("could not get pvs for calculation of state diff: %w", err)
 	}
+	currentState := utils.Map(pvs, func(pv *lvm2go.PhysicalVolume) lvm2go.PhysicalVolumeName {
+		return pv.Name
+	})
 
 	return utils.SequentialTwoWaySync(
-		utils.Map(vg.Spec.PVs, func(pv string) lvm2go.PhysicalVolumeName {
-			return lvm2go.PhysicalVolumeName(pv)
-		}),
-		utils.Map(pvs, func(pv *lvm2go.PhysicalVolume) lvm2go.PhysicalVolumeName {
-			return pv.Name
-		}),
+		desiredState,
+		currentState,
 		func(names []lvm2go.PhysicalVolumeName) error {
 			return r.LVM.VGExtend(ctx, name, lvm2go.PhysicalVolumeNames(names))
 		},
@@ -93,43 +107,42 @@ func (r *VolumeGroupReconciler) syncStatus(
 	vg *v1alpha1.VolumeGroup,
 	lvm *lvm2go.VolumeGroup,
 ) (err error) {
-	status := &vg.Status
 	pvs, err := r.LVM.PVs(ctx, lvm.Name)
 	if err != nil {
 		return fmt.Errorf("could not get pvs for status summary: %w", err)
 	}
 
-	status.PVs = utils.Map(pvs, func(pv *lvm2go.PhysicalVolume) string {
+	vg.Status.PVs = utils.Map(pvs, func(pv *lvm2go.PhysicalVolume) string {
 		return string(pv.Name)
 	})
 
-	status.Name = string(lvm.Name)
-	status.UUID = lvm.UUID
-	status.SysID = lvm.SysID
-	status.VGAttributes = lvm.VGAttributes
-	status.Tags = lvm.Tags
-	status.ExtentSize, err = convertSizeToQuantity(lvm.ExtentSize)
+	vg.Status.Name = string(lvm.Name)
+	vg.Status.UUID = lvm.UUID
+	vg.Status.SysID = lvm.SysID
+	vg.Status.VGAttributes = lvm.VGAttributes
+	vg.Status.Tags = lvm.Tags
+	vg.Status.ExtentSize, err = convertSizeToQuantity(lvm.ExtentSize)
 	if err != nil {
 		return err
 	}
-	status.ExtentCount = lvm.ExtentCount
-	status.SeqNo = lvm.SeqNo
-	status.Size, err = convertSizeToQuantity(lvm.Size)
+	vg.Status.ExtentCount = lvm.ExtentCount
+	vg.Status.SeqNo = lvm.SeqNo
+	vg.Status.Size, err = convertSizeToQuantity(lvm.Size)
 	if err != nil {
 		return err
 	}
-	status.Free, err = convertSizeToQuantity(lvm.Free)
+	vg.Status.Free, err = convertSizeToQuantity(lvm.Free)
 	if err != nil {
 		return err
 	}
-	status.PvCount = lvm.PvCount
-	status.MissingPVCount = lvm.MissingPVCount
-	status.MaxPv = lvm.MaxPv
-	status.LvCount = lvm.LvCount
-	status.MaxLv = lvm.MaxLv
-	status.SnapCount = lvm.SnapCount
-	status.MDACount = lvm.MDACount
-	status.MDAUsedCount = lvm.MDAUsedCount
-	status.MDACopies = lvm.MDACopies
+	vg.Status.PvCount = lvm.PvCount
+	vg.Status.MissingPVCount = lvm.MissingPVCount
+	vg.Status.MaxPv = lvm.MaxPv
+	vg.Status.LvCount = lvm.LvCount
+	vg.Status.MaxLv = lvm.MaxLv
+	vg.Status.SnapCount = lvm.SnapCount
+	vg.Status.MDACount = lvm.MDACount
+	vg.Status.MDAUsedCount = lvm.MDAUsedCount
+	vg.Status.MDACopies = lvm.MDACopies
 	return nil
 }

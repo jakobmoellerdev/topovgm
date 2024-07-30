@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jakobmoellerdev/lvm2go"
 	"github.com/topolvm/topovgm/api/v1alpha1"
+	"github.com/topolvm/topovgm/internal/selector"
+	"github.com/topolvm/topovgm/internal/utils"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -16,7 +19,21 @@ func nameOnNode(vg *v1alpha1.VolumeGroup) lvm2go.VolumeGroupName {
 	return name
 }
 
-func convertToVGCreateOptions(vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions, error) {
+func pvsFromSpec(ctx context.Context, vg *v1alpha1.VolumeGroup) ([]lvm2go.PhysicalVolumeName, error) {
+	desiredState := vg.Spec.PVs
+	if len(desiredState) == 0 {
+		if fromSelector, err := selector.DevicesMatchingSelector(ctx, vg.Spec.PVSelector); err != nil {
+			return nil, fmt.Errorf("could not get devices matching selector: %w", err)
+		} else {
+			desiredState = fromSelector
+		}
+	}
+	return utils.Map(desiredState, func(pv string) lvm2go.PhysicalVolumeName {
+		return lvm2go.PhysicalVolumeName(pv)
+	}), nil
+}
+
+func convertToVGCreateOptions(ctx context.Context, vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions, error) {
 	opts := &lvm2go.VGCreateOptions{
 		VolumeGroupName: nameOnNode(vg),
 	}
@@ -25,8 +42,10 @@ func convertToVGCreateOptions(vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions
 		opts.Tags = vg.Spec.Tags
 	}
 
-	if vg.Spec.PVs != nil {
-		opts.PhysicalVolumeNames = convertToPhysicalVolumeNames(vg.Spec.PVs)
+	var err error
+	opts.PhysicalVolumeNames, err = pvsFromSpec(ctx, vg)
+	if err != nil {
+		return nil, fmt.Errorf("could not get physical volume names from spec: %w", err)
 	}
 
 	if vg.Spec.AutoActivation != nil {
@@ -59,15 +78,6 @@ func convertToVGCreateOptions(vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions
 
 	return opts, nil
 }
-
-func convertToPhysicalVolumeNames(pvs []string) []lvm2go.PhysicalVolumeName {
-	physicalVolumes := make([]lvm2go.PhysicalVolumeName, 0, len(pvs))
-	for _, pv := range pvs {
-		physicalVolumes = append(physicalVolumes, lvm2go.PhysicalVolumeName(pv))
-	}
-	return physicalVolumes
-}
-
 func convertToAutoActivation(autoActivation *bool) lvm2go.AutoActivation {
 	if autoActivation == nil {
 		return lvm2go.SetAutoActivate

@@ -83,7 +83,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			By("validating that the controller-manager pod is running as expected")
 			verifyControllerUp := func() error {
-				// Get pod name
+				// GetString pod name
 
 				cmd = exec.Command("kubectl", "get",
 					"pods", "-l", "control-plane=controller-manager",

@@ -9,5 +9,10 @@ spec:
   nodeName: crc
   tags:
     - topovgm
-  pvs:
-    - /dev/loop0
+  pvSelector:
+    pvSelectorTerms:
+    - matchLSBLK:
+        - key: TYPE
+          operator: In
+          values:
+            - loop
