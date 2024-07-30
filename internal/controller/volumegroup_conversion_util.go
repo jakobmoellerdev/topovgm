@@ -5,9 +5,7 @@ import (
 
 	"github.com/jakobmoellerdev/lvm2go"
 	"github.com/topolvm/topovgm/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func nameOnNode(vg *v1alpha1.VolumeGroup) lvm2go.VolumeGroupName {
@@ -16,38 +14,6 @@ func nameOnNode(vg *v1alpha1.VolumeGroup) lvm2go.VolumeGroupName {
 		name = lvm2go.VolumeGroupName(*vg.Spec.NameOnNode)
 	}
 	return name
-}
-
-func setStatusFromLVMVolumeGroup(vg *v1alpha1.VolumeGroup, lvmvg *lvm2go.VolumeGroup) (err error) {
-	vg.Status.Name = string(lvmvg.Name)
-	vg.Status.UUID = lvmvg.UUID
-	vg.Status.SysID = lvmvg.SysID
-	vg.Status.VGAttributes = lvmvg.VGAttributes
-	vg.Status.Tags = lvmvg.Tags
-	vg.Status.ExtentSize, err = convertSizeToQuantity(lvmvg.ExtentSize)
-	if err != nil {
-		return err
-	}
-	vg.Status.ExtentCount = lvmvg.ExtentCount
-	vg.Status.SeqNo = lvmvg.SeqNo
-	vg.Status.Size, err = convertSizeToQuantity(lvmvg.Size)
-	if err != nil {
-		return err
-	}
-	vg.Status.Free, err = convertSizeToQuantity(lvmvg.Free)
-	if err != nil {
-		return err
-	}
-	vg.Status.PvCount = lvmvg.PvCount
-	vg.Status.MissingPVCount = lvmvg.MissingPVCount
-	vg.Status.MaxPv = lvmvg.MaxPv
-	vg.Status.LvCount = lvmvg.LvCount
-	vg.Status.MaxLv = lvmvg.MaxLv
-	vg.Status.SnapCount = lvmvg.SnapCount
-	vg.Status.MDACount = lvmvg.MDACount
-	vg.Status.MDAUsedCount = lvmvg.MDAUsedCount
-	vg.Status.MDACopies = lvmvg.MDACopies
-	return nil
 }
 
 func convertToVGCreateOptions(vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions, error) {
@@ -133,26 +99,4 @@ func convertSizeToQuantity(size lvm2go.Size) (*resource.Quantity, error) {
 		return nil, err
 	}
 	return resource.NewQuantity(int64(q.Val), resource.DecimalSI), nil
-}
-
-func setSyncedOnHostCondition(conditions *[]metav1.Condition, err error) {
-	condition := metav1.Condition{
-		Type: ConditionTypeVolumeGroupSyncedOnNode,
-	}
-
-	if err == nil {
-		condition.Status = metav1.ConditionTrue
-		condition.Reason = ReasonVolumeGroupCreated
-		condition.Message = MessageVolumeGroupCreated
-	} else {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = ReasonVolumeGroupCreationFailed
-		condition.Message = err.Error()
-	}
-
-	if conditions == nil {
-		*conditions = []metav1.Condition{}
-	}
-
-	meta.SetStatusCondition(conditions, condition)
 }

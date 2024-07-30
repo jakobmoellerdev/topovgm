@@ -18,20 +18,50 @@ func InLeftButNotInRight[T comparable](left, right []T) []T {
 	for _, x := range right {
 		m[x] = struct{}{}
 	}
+
 	var diff []T
 	for _, x := range left {
 		if _, ok := m[x]; !ok {
 			diff = append(diff, x)
 		}
 	}
+
 	return diff
 }
 
-// ConvertSlice converts a slice of type T to a slice of type R using the provided conversion function.
-func ConvertSlice[T any, R any](original []T, convert func(T) R) []R {
+// Map maps a slice of type T to a slice of type R using the provided map function.
+func Map[T any, R any](original []T, mapf func(T) R) []R {
 	slice := make([]R, 0, len(original))
 	for _, x := range original {
-		slice = append(slice, convert(x))
+		slice = append(slice, mapf(x))
 	}
 	return slice
+}
+
+// SequentialTwoWaySync synchronizes two slices of type T as desired and current.
+// It calls new with the elements that are in desired but not in current.
+// It calls old with the elements that are in current but not in desired.
+func SequentialTwoWaySync[T comparable](
+	desired []T,
+	current []T,
+	new func(diff []T) error,
+	old func(diff []T) error,
+) error {
+	var newFromA, oldFromB []T
+	newFromA = InLeftButNotInRight(desired, current)
+	oldFromB = InLeftButNotInRight(current, desired)
+
+	if len(newFromA) > 0 {
+		if err := new(newFromA); err != nil {
+			return err
+		}
+	}
+
+	if len(oldFromB) > 0 {
+		if err := old(oldFromB); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

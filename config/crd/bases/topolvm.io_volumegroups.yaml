@@ -227,6 +227,10 @@ spec:
                 type: integer
               name:
                 type: string
+              pvs:
+                items:
+                  type: string
+                type: array
               seqno:
                 format: int64
                 type: integer

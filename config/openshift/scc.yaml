@@ -1,0 +1,32 @@
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: controller-manager-scc
+allowPrivilegedContainer: true
+allowHostDirVolumePlugin: true
+priority:
+allowHostNetwork: false
+allowHostPorts: false
+allowedCapabilities: []
+allowHostPID: true
+allowHostIPC: false
+readOnlyRootFilesystem: false
+requiredDropCapabilities: []
+defaultAddCapabilities: []
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+users:
+  - system:serviceaccount:topolvm-system:topovgm-controller-manager
+volumes:
+  - configMap
+  - emptyDir
+  - hostPath
+  - persistentVolumeClaim
+  - secret
+

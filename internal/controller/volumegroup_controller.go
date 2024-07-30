@@ -22,21 +22,17 @@ import (
 	"fmt"
 
 	"github.com/jakobmoellerdev/lvm2go"
-	"github.com/topolvm/topovgm/internal/utils"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/topolvm/topovgm/api/v1alpha1"
 )
 
 const (
-	// ConditionTypeVolumeGroupSyncedOnNode is a condition type that indicates whether the volume group is present on the host node.
-	ConditionTypeVolumeGroupSyncedOnNode = "VolumeGroupSyncedOnNode"
-	ReasonVolumeGroupCreated             = "VolumeGroupCreated"
-	ReasonVolumeGroupCreationFailed      = "VolumeGroupCreationFailed"
-	MessageVolumeGroupCreated            = "The volume group is present on the node and discoverable in the lvm2 subsystem."
+	VolumeGroupFinalizer = "topolvm.io/volumegroup-removal-on-node"
 )
 
 // VolumeGroupReconciler reconciles a VolumeGroup object
@@ -83,96 +79,50 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *VolumeGroupReconciler) reconcile(ctx context.Context, vg *v1alpha1.VolumeGroup) error {
 	name := nameOnNode(vg)
 
-	lvmvg, err := r.LVM.VG(ctx, name)
-	if errors.Is(err, lvm2go.ErrVolumeGroupNotFound) {
-		if !vg.GetDeletionTimestamp().IsZero() {
-			return nil
-		}
-
-		if opts, err := convertToVGCreateOptions(vg); err != nil {
-			return fmt.Errorf("failed to convert to VGCreateOptions: %w", err)
-		} else if err := r.LVM.VGCreate(ctx, opts); err != nil {
-			return r.updateStatus(ctx, vg, err)
-		}
-		lvmvg, err = r.LVM.VG(ctx, name)
-	} else if !vg.GetDeletionTimestamp().IsZero() {
-		if err := r.LVM.VGRemove(ctx, name); err != nil {
+	if !vg.GetDeletionTimestamp().IsZero() {
+		if err := r.LVM.VGRemove(ctx, name); err != nil && !lvm2go.IsLVMNotFound(err) {
 			return fmt.Errorf("failed to remove volume group: %w", err)
+		}
+		if updated := controllerutil.RemoveFinalizer(vg, VolumeGroupFinalizer); updated {
+			return r.Update(ctx, vg)
 		}
 		return nil
 	}
 
+	lvm, err := r.LVM.VG(ctx, name)
+
+	if errors.Is(err, lvm2go.ErrVolumeGroupNotFound) {
+		err = r.initializeVG(ctx, vg)
+	}
+
 	if err != nil {
-		return r.updateStatus(ctx, vg, err)
+		return r.Client.Status().Update(ctx, vg)
 	}
 
-	if err := r.sync(ctx, vg, lvmvg); err != nil {
-		return fmt.Errorf("failed to sync: %w", err)
+	if updated := controllerutil.AddFinalizer(vg, VolumeGroupFinalizer); updated {
+		return r.Update(ctx, vg)
 	}
 
-	return r.updateStatusWithVG(ctx, vg, lvmvg, err)
+	if err = r.sync(ctx, vg, lvm); err != nil {
+		err = fmt.Errorf("failed to sync volume group with lvm2: %w", err)
+	}
+
+	if statusErr := r.syncStatus(ctx, vg, lvm); statusErr != nil {
+		err = errors.Join(err, fmt.Errorf("failed to sync status from lvm2 into volume group: %w", statusErr))
+	}
+
+	return errors.Join(err, r.Client.Status().Update(ctx, vg))
 }
 
-func (r *VolumeGroupReconciler) updateStatusWithVG(
-	ctx context.Context,
-	vg *v1alpha1.VolumeGroup,
-	lvmvg *lvm2go.VolumeGroup,
-	err error,
-) error {
-	if err := setStatusFromLVMVolumeGroup(vg, lvmvg); err != nil {
-		return fmt.Errorf("failed to set status from LVM volume group: %w", err)
+func (r *VolumeGroupReconciler) initializeVG(ctx context.Context, vg *v1alpha1.VolumeGroup) error {
+	opts, err := convertToVGCreateOptions(vg)
+	if err != nil {
+		return fmt.Errorf("failed to convert VolumeGroup to VGCreateOptions: %w", err)
 	}
-	return r.updateStatus(ctx, vg, err)
-}
 
-func (r *VolumeGroupReconciler) updateStatus(
-	ctx context.Context,
-	vg *v1alpha1.VolumeGroup,
-	err error,
-) error {
-	setSyncedOnHostCondition(&vg.Status.Conditions, err)
-	if err := r.Client.Status().Update(ctx, vg); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
+	if err = r.LVM.VGCreate(ctx, opts); err != nil {
+		SetSyncedOnHostCreationFailed(&vg.Status.Conditions, vg.GetGeneration(), err)
 	}
+
 	return err
-}
-
-func (r *VolumeGroupReconciler) sync(
-	ctx context.Context,
-	vg *v1alpha1.VolumeGroup,
-	lvmvg *lvm2go.VolumeGroup,
-) error {
-	if newFromSpec := utils.InLeftButNotInRight(vg.Spec.Tags, lvmvg.Tags); len(newFromSpec) > 0 {
-		if err := r.LVM.VGChange(ctx, lvmvg.Name, lvm2go.Tags(newFromSpec)); err != nil {
-			return fmt.Errorf("failed to synchronize tags: %w", err)
-		}
-	}
-	if oldFromLVM := utils.InLeftButNotInRight(lvmvg.Tags, vg.Spec.Tags); len(oldFromLVM) > 0 {
-		if err := r.LVM.VGChange(ctx, lvmvg.Name, lvm2go.DelTags(oldFromLVM)); err != nil {
-			return fmt.Errorf("failed to synchronize tags: %w", err)
-		}
-	}
-
-	pvs, err := r.LVM.PVs(ctx, lvmvg.Name)
-	if err != nil {
-		return fmt.Errorf("failed to synchronize pvs: %w", err)
-	}
-	inSpec := utils.ConvertSlice(vg.Spec.PVs, func(pv string) lvm2go.PhysicalVolumeName {
-		return lvm2go.PhysicalVolumeName(pv)
-	})
-	inLVM := utils.ConvertSlice(pvs, func(pv *lvm2go.PhysicalVolume) lvm2go.PhysicalVolumeName {
-		return pv.Name
-	})
-	if newFromSpec := utils.InLeftButNotInRight(inSpec, inLVM); len(newFromSpec) > 0 {
-		if err := r.LVM.VGExtend(ctx, lvmvg.Name, lvm2go.PhysicalVolumeNames(newFromSpec)); err != nil {
-			return fmt.Errorf("failed to extend volume group: %w", err)
-		}
-	}
-	if oldFromLVM := utils.InLeftButNotInRight(inLVM, inSpec); len(oldFromLVM) > 0 {
-		if err := r.LVM.VGReduce(ctx, lvmvg.Name, lvm2go.PhysicalVolumeNames(oldFromLVM)); err != nil {
-			return fmt.Errorf("failed to reduce volume group: %w", err)
-		}
-	}
-
-	return nil
 }

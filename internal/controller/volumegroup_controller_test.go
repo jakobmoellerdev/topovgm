@@ -19,11 +19,13 @@ package controller
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"hash"
 	"hash/fnv"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/jakobmoellerdev/lvm2go"
 	. "github.com/onsi/ginkgo/v2"
@@ -44,92 +46,122 @@ var _ = Describe("VolumeGroup Controller", func() {
 		const resourceNamespace = "default"
 		const nodeName = "test-node"
 
-		ctx := context.Background()
-
-		client := lvm2go.NewClient()
-
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
 			Namespace: resourceNamespace,
 		}
-		volumegroup := &topolvmv1alpha1.VolumeGroup{}
 
-		var loop lvm2go.LoopbackDevice
-		BeforeEach(func() {
-			backingFilePath := filepath.Join(GinkgoT().TempDir(), fmt.Sprintf("%s.img", NewNonDeterministicTestID(GinkgoT())))
-			By("creating a loopback device")
-			var err error
-			loop, err = lvm2go.CreateLoopbackDevice(lvm2go.MustParseSize("10M"))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(loop.FindFree()).To(Succeed())
-			Expect(loop.SetBackingFile(backingFilePath)).To(Succeed())
-			Expect(loop.Open()).To(Succeed())
-		})
-		AfterEach(func() {
-			By("cleaning up the loopback device")
-			Expect(loop.Close()).To(Succeed())
-		})
+		ctx := context.Background()
+		client := lvm2go.NewClient()
+
+		loop := SetupLoopbackDevice()
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind VolumeGroup")
-			err := k8sClient.Get(ctx, typeNamespacedName, volumegroup)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &topolvmv1alpha1.VolumeGroup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: resourceNamespace,
+			By("creating VolumeGroup resource")
+			resource := &topolvmv1alpha1.VolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: resourceNamespace,
+				},
+				Spec: topolvmv1alpha1.VolumeGroupSpec{
+					NodeName: nodeName,
+					PVs: []string{
+						loop().Device(),
 					},
-					Spec: topolvmv1alpha1.VolumeGroupSpec{
-						NodeName: nodeName,
-						PVs: []string{
-							loop.Device(),
-						},
+					Tags: []string{
+						ValidLVMTag(GinkgoT().Name()),
 					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				},
 			}
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 		})
-
 		AfterEach(func() {
 			resource := &topolvmv1alpha1.VolumeGroup{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the VolumeGroup CR")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			if errors.IsNotFound(err) {
+				return
+			}
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoLogr.Info("summarizing the resource", "resource", resource)
+			encoder := json.NewEncoder(GinkgoWriter)
+			encoder.SetIndent("", "  ")
+			Expect(encoder.Encode(resource)).To(Succeed())
 		})
-		It("should successfully reconcile the CR", func() {
-			By("reconciling the created CR")
-			controllerReconciler := &VolumeGroupReconciler{
+
+		var controllerReconciler *VolumeGroupReconciler
+		BeforeEach(func() {
+			By("initializing the controller reconciler")
+			controllerReconciler = &VolumeGroupReconciler{
 				Client:   k8sClient,
 				Scheme:   k8sClient.Scheme(),
 				LVM:      client,
 				NodeName: nodeName,
 			}
+		})
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+		It("should successfully reconcile the CR", func() {
+			By("reconciling the created CR", func() {
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
 			})
-			Expect(err).NotTo(HaveOccurred())
 
-			By("having a VolumeGroupSyncedOnNode condition set to true")
-			resource := &topolvmv1alpha1.VolumeGroup{}
-			Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
-			nodeCondition := meta.FindStatusCondition(
-				resource.Status.Conditions,
-				ConditionTypeVolumeGroupSyncedOnNode,
-			)
-			Expect(nodeCondition).NotTo(BeNil())
-			Expect(nodeCondition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupCreated))
+			By("having set the volume group finalizer", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				Expect(resource.GetFinalizers()).To(ContainElement(VolumeGroupFinalizer))
+			})
 
-			By("having a lvm2 volume group created")
-			vg, err := client.VG(ctx, lvm2go.VolumeGroupName(resourceName))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(vg).NotTo(BeNil())
+			By("reconciling the created CR again to sync it with the lvm state and triggering a condition", func() {
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			By("having a lvm2 volume group created", func() {
+				vg, err := client.VG(ctx, lvm2go.VolumeGroupName(resourceName))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vg).NotTo(BeNil())
+			})
+
+			By("having a VolumeGroupSyncedOnNode condition set to true", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				nodeCondition := meta.FindStatusCondition(
+					resource.Status.Conditions,
+					ConditionTypeVolumeGroupSyncedOnNode,
+				)
+				Expect(nodeCondition).NotTo(BeNil())
+				Expect(nodeCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupCreated))
+			})
+
+			By("Delete the VolumeGroup CR and make it drop the finalizer", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				err := k8sClient.Get(ctx, typeNamespacedName, resource)
+				if errors.IsNotFound(err) {
+					return
+				}
+				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(k8sClient.Get(ctx, typeNamespacedName, &topolvmv1alpha1.VolumeGroup{})).Should(Satisfy(errors.IsNotFound))
+			})
 		})
 	})
 })
+
+func ValidLVMTag(name string) string {
+	name = strings.ToLower(name)
+	return strings.NewReplacer(" ", "-", "_", "-").Replace(name)
+}
 
 type TestIDT interface {
 	Fatal(args ...any)
@@ -149,4 +181,26 @@ func NewNonDeterministicTestHash(t TestIDT) hash.Hash32 {
 		t.Fatal(err)
 	}
 	return hashedTestName
+}
+
+func SetupLoopbackDevice() func() lvm2go.LoopbackDevice {
+	var loop lvm2go.LoopbackDevice
+	BeforeEach(func() {
+		By("preparing a new loopback device")
+		backingFilePath := filepath.Join(GinkgoT().TempDir(), fmt.Sprintf("%s.img", NewNonDeterministicTestID(GinkgoT())))
+		var err error
+		loop, err = lvm2go.CreateLoopbackDevice(lvm2go.MustParseSize("10M"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(loop.FindFree()).To(Succeed())
+		Expect(loop.SetBackingFile(backingFilePath)).To(Succeed())
+		By(fmt.Sprintf("creating %q - backing file: %q", loop.Device(), loop.File()))
+		Expect(loop.Open()).To(Succeed())
+	})
+	AfterEach(func() {
+		By("cleaning up the loopback device")
+		Expect(loop.Close()).To(Succeed())
+	})
+	return func() lvm2go.LoopbackDevice {
+		return loop
+	}
 }

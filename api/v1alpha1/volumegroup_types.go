@@ -60,6 +60,8 @@ type VolumeGroupStatus struct {
 	UUID  string `json:"uuid,omitempty"`
 	SysID string `json:"sysid,omitempty"`
 
+	PVs []string `json:"pvs,omitempty"`
+
 	VGAttributes string   `json:"attr,omitempty"`
 	Tags         []string `json:"tags,omitempty"`
 
