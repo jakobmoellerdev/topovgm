@@ -57,11 +57,11 @@ func (r *VolumeGroupReconciler) sync(
 
 		if vg.Spec.DeviceLossSynchronizationPolicy != v1alpha1.DeviceLossSynchronizationPolicyFail {
 			logger.Info("device loss detected, removing missing physical volumes")
-			opts := []lvm2go.Argument{lvm2go.RemoveMissing(true)}
+			opts := []lvm2go.VGReduceOption{lvmvg.Name, lvm2go.RemoveMissing(true)}
 			if vg.Spec.DeviceLossSynchronizationPolicy == v1alpha1.DeviceLossSynchronizationPolicyForceRemoveMissing {
 				opts = append(opts, lvm2go.Force(true))
 			}
-			if err := r.LVM.VGReduce(ctx, lvmvg.Name, lvm2go.RemoveMissing(true)); err != nil {
+			if err := r.LVM.VGReduce(ctx, opts...); err != nil {
 				return fmt.Errorf("could not remove missing physical volumes (attempted due to DeviceLossSynchronizationPolicy): %w", err)
 			}
 			return r.sync(ctx, vg, lvmvg)
