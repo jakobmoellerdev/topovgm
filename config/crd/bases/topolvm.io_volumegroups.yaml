@@ -81,6 +81,18 @@ spec:
                 x-kubernetes-validations:
                 - message: the data alignment offset cannot be changed once set
                   rule: self == oldSelf
+              deviceLossSynchronizationPolicy:
+                default: Fail
+                description: DeviceLossSynchronizationPolicy controls the behavior
+                  of the volume group when a device is lost or fails to be discovered
+                  after creation.
+                type: string
+              deviceRemovalVolumePolicy:
+                default: MoveAndReduce
+                description: DeviceRemovalVolumePolicy controls how the volume group
+                  will be synchronized when devices are removed from the desired set
+                  of physical volumes.
+                type: string
               devices:
                 description: |-
                   Restricts the devices that are visible and accessible to the command. Devices not listed will appear to be missing.
@@ -309,7 +321,7 @@ spec:
             properties:
               attributes:
                 description: |-
-                  VGAttributes are various attributes of the volume group.
+                  Attributes are various attributes of the volume group.
                   Corresponds to vg_attr.
                 type: string
               conditions:
@@ -407,39 +419,39 @@ spec:
                   Corresponds to vg_free.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
-              lvCount:
+              logicalVolumeCount:
                 description: |-
-                  LvCount is the number of logical volumes in the volume group.
+                  LogicalVolumeCount is the number of logical volumes in the volume group.
                   Corresponds to lv_count.
                 format: int64
                 type: integer
-              maxLv:
+              maximumLogicalVolumes:
                 description: |-
-                  MaxLv is the maximum number of logical volumes allowed in the volume group.
+                  MaximumLogicalVolumes is the maximum number of logical volumes allowed in the volume group.
                   Corresponds to max_lv.
                 format: int64
                 type: integer
-              maxPv:
+              maximumPhysicalVolumes:
                 description: |-
-                  MaxPv is the maximum number of physical volumes allowed in the volume group.
+                  MaximumPhysicalVolumes is the maximum number of physical volumes allowed in the volume group.
                   Corresponds to max_pv.
                 format: int64
                 type: integer
-              mdaCount:
+              metadataAreaCount:
                 description: |-
-                  MDACount is the number of metadata areas on the volume group.
+                  MetadataAreaCount is the number of metadata areas on the volume group.
                   Corresponds to vg_mda_count.
                 format: int64
                 type: integer
-              mdaUsedCount:
+              metadataAreaUsedCount:
                 description: |-
-                  MDAUsedCount is the number of metadata areas in use on the volume group.
+                  MetadataAreaUsedCount is the number of metadata areas in use on the volume group.
                   Corresponds to vg_mda_used_count.
                 format: int64
                 type: integer
-              missingPvCount:
+              missingPhysicalVolumeCount:
                 description: |-
-                  MissingPVCount is the number of physical volumes in the volume group which are missing.
+                  MissingPhysicalVolumeCount is the number of physical volumes in the volume group which are missing.
                   Corresponds to vg_missing_pv_count.
                 format: int64
                 type: integer
@@ -448,20 +460,156 @@ spec:
                   Name is the current name of the volume group on the node as visible in lvm2.
                   Corresponds to vg_name.
                 type: string
-              pvCount:
+              physicalVolumeCount:
                 description: |-
-                  PvCount is the number of physical volumes in the volume group.
+                  PhysicalVolumeCount is the number of physical volumes in the volume group.
                   Corresponds to pv_count.
                 format: int64
                 type: integer
-              pvs:
-                description: PVs is a list of physical volumes in the volume group.
+              physicalVolumes:
+                description: PhysicalVolumes is a list of physical volumes in the
+                  volume group.
                 items:
-                  type: string
+                  properties:
+                    attributes:
+                      description: |-
+                        Attributes is the attributes of the physical volume.
+                        Corresponds to pv_attr.
+                      type: string
+                    deviceID:
+                      description: |-
+                        DeviceID is the device ID of the physical volume.
+                        Corresponds to pv_device_id.
+                      type: string
+                    deviceIDType:
+                      description: |-
+                        DeviceIDType is device ID type of the physical volume.
+                        Corresponds to pv_device_id_type.
+                      type: string
+                    deviceSize:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        DeviceSize is the size of the physical volume.
+                        Corresponds to dev_size.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    free:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Free is the amount of free space in the physical volume.
+                        Corresponds to pv_free.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    major:
+                      description: |-
+                        Major is the major number of the physical volume.
+                        Corresponds to pv_major.
+                      format: int64
+                      type: integer
+                    metadataAreaCount:
+                      description: |-
+                        MetadataAreaCount is the number of metadata areas on the physical volume.
+                        Corresponds to pv_mda_count.
+                      format: int64
+                      type: integer
+                    metadataAreaFree:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        MetadataAreaFree is the amount of free space in the metadata area of the physical volume.
+                        Corresponds to pv_mda_free.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    metadataAreaSize:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        MetadataAreaSize is the size of the metadata area of the physical volume.
+                        Corresponds to pv_mda_size.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    metadataAreaUsedCount:
+                      description: |-
+                        MetadataAreaUsedCount is the number of metadata areas in use on the physical volume.
+                        Corresponds to pv_mda_used_count.
+                      format: int64
+                      type: integer
+                    minor:
+                      description: |-
+                        Minor is the minor number of the physical volume.
+                        Corresponds to pv_minor.
+                      format: int64
+                      type: integer
+                    name:
+                      description: |-
+                        Name is the name of the physical volume.
+                        Corresponds to pv_name.
+                      type: string
+                    physicalExtentStart:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        PhysicalExtentStart is the offset to the start of data on the underlying device.
+                        Corresponds to pe_start.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    size:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Size is the size of the physical volume.
+                        Corresponds to pv_size.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    tags:
+                      description: |-
+                        Tags are tags applied to the physical volume.
+                        Corresponds to pv_tags.
+                      items:
+                        type: string
+                      type: array
+                    used:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Used is the amount of used space in the physical volume.
+                        Corresponds to pv_used.
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    uuid:
+                      description: |-
+                        UUID is the UUID of the physical volume.
+                        Corresponds to pv_uuid.
+                      type: string
+                  required:
+                  - attributes
+                  - deviceSize
+                  - free
+                  - major
+                  - metadataAreaCount
+                  - metadataAreaFree
+                  - metadataAreaSize
+                  - metadataAreaUsedCount
+                  - minor
+                  - name
+                  - physicalExtentStart
+                  - size
+                  - used
+                  type: object
                 type: array
               seqno:
                 description: |-
-                  SeqNo is the revision number of internal metadata.
+                  SequenceNumber is the revision number of internal metadata.
+                  It is similar to the ResourceVersion, but on the Host System.
                   Corresponds to vg_seqno.
                 format: int64
                 type: integer
@@ -474,9 +622,9 @@ spec:
                   Corresponds to vg_size.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
-              snapCount:
+              snapshotCount:
                 description: |-
-                  SnapCount is the number of snapshots in the volume group.
+                  SnapshotCount is the number of snapshots in the volume group.
                   Corresponds to snap_count.
                 format: int64
                 type: integer

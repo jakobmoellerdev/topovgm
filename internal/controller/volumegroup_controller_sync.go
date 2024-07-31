@@ -43,6 +43,35 @@ func (r *VolumeGroupReconciler) sync(
 	}
 	err := errors.Join(errs...)
 
+	// Handle device loss based on the DeviceLossSynchronizationPolicy.
+	// If activated and the volume group is missing physical volumes, remove them.
+	// If set to Fail and the volume group is missing physical volumes, return an error.
+	if lvm2go.IsLVMErrVGMissingPVs(err) {
+		if missingVG, missingPV, lastWritePath, ok := lvm2go.LVMErrVGMissingPVsDetails(err); ok {
+			logger = logger.WithValues(
+				"missingVolumeGroup", missingVG,
+				"missingPhysicalVolume", missingPV,
+				"lastWritePath", lastWritePath,
+			)
+		}
+
+		if vg.Spec.DeviceLossSynchronizationPolicy != v1alpha1.DeviceLossSynchronizationPolicyFail {
+			logger.Info("device loss detected, removing missing physical volumes")
+			opts := []lvm2go.Argument{lvm2go.RemoveMissing(true)}
+			if vg.Spec.DeviceLossSynchronizationPolicy == v1alpha1.DeviceLossSynchronizationPolicyForceRemoveMissing {
+				opts = append(opts, lvm2go.Force(true))
+			}
+			if err := r.LVM.VGReduce(ctx, lvmvg.Name, lvm2go.RemoveMissing(true)); err != nil {
+				return fmt.Errorf("could not remove missing physical volumes (attempted due to DeviceLossSynchronizationPolicy): %w", err)
+			}
+			return r.sync(ctx, vg, lvmvg)
+		}
+
+		logger.Info("device loss detected")
+		SetSyncedOnHostCreationFailed(&vg.Status.Conditions, vg.GetGeneration(), err)
+		return err
+	}
+
 	if err != nil {
 		SetSyncedOnHostCreationFailed(&vg.Status.Conditions, vg.GetGeneration(), err)
 	} else {
@@ -100,7 +129,18 @@ func (r *VolumeGroupReconciler) syncPVs(
 			return r.LVM.VGExtend(ctx, name, lvm2go.PhysicalVolumeNames(names))
 		},
 		func(names []lvm2go.PhysicalVolumeName) error {
-			return r.LVM.VGReduce(ctx, name, lvm2go.PhysicalVolumeNames(names))
+			args := []lvm2go.VGReduceOption{name, lvm2go.PhysicalVolumeNames(names)}
+			switch vg.Spec.DeviceRemovalVolumePolicy {
+			case v1alpha1.DeviceRemovalVolumePolicyMoveAndReduce:
+				for _, pv := range names {
+					if err := r.LVM.PVMove(ctx, pv, lvm2go.PhysicalVolumeNames(desiredState)); err != nil {
+						return err
+					}
+				}
+			case v1alpha1.DeviceRemovalVolumePolicyForceReduce:
+				args = append(args, lvm2go.Force(true))
+			}
+			return r.LVM.VGReduce(ctx, args...)
 		},
 	)
 }
@@ -148,7 +188,7 @@ func (r *VolumeGroupReconciler) syncAllocationPolicy(
 		return nil
 	}
 
-	desired := lvm2go.AllocationPolicy(*vg.Spec.AllocationPolicy)
+	desired := lvm2go.AllocationPolicy(utils.ToSnakeCase(string(*vg.Spec.AllocationPolicy)))
 
 	if lvm.AllocationPolicy == desired {
 		return nil
@@ -183,41 +223,70 @@ func (r *VolumeGroupReconciler) syncStatus(
 	vg *v1alpha1.VolumeGroup,
 	lvm *lvm2go.VolumeGroup,
 ) (err error) {
-	pvs, err := r.LVM.PVs(ctx, lvm.Name)
+	pvs, err := r.LVM.PVs(ctx, lvm.Name, lvm2go.UnitBytes)
 	if err != nil {
 		return fmt.Errorf("could not get pvs for status summary: %w", err)
 	}
 
-	vg.Status.PVs = utils.Map(pvs, func(pv *lvm2go.PhysicalVolume) string {
-		return string(pv.Name)
-	})
+	vg.Status.PhysicalVolumes = make([]v1alpha1.PhysicalVolumeStatus, len(pvs))
+	for i, pv := range pvs {
+		vg.Status.PhysicalVolumes[i].Name = string(pv.Name)
+		vg.Status.PhysicalVolumes[i].UUID = pv.UUID
+		if vg.Status.PhysicalVolumes[i].DeviceSize, err = convertSizeToQuantity(pv.DevSize); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].Size, err = convertSizeToQuantity(pv.Size); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].Free, err = convertSizeToQuantity(pv.Free); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].Used, err = convertSizeToQuantity(pv.Used); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].MetadataAreaFree, err = convertSizeToQuantity(pv.MdaFree); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].MetadataAreaSize, err = convertSizeToQuantity(pv.MdaSize); err != nil {
+			return err
+		}
+		if vg.Status.PhysicalVolumes[i].PhysicalExtentStart, err = convertSizeToQuantity(pv.PeStart); err != nil {
+			return err
+		}
+		vg.Status.PhysicalVolumes[i].MetadataAreaCount = pv.MdaCount
+		vg.Status.PhysicalVolumes[i].MetadataAreaUsedCount = pv.MdaUsedCount
+		vg.Status.PhysicalVolumes[i].Tags = pv.Tags
+		vg.Status.PhysicalVolumes[i].DeviceID = pv.DeviceID
+		vg.Status.PhysicalVolumes[i].DeviceIDType = pv.DeviceIDType
+		vg.Status.PhysicalVolumes[i].Attributes = pv.Attr.String()
+		vg.Status.PhysicalVolumes[i].Minor = pv.Minor
+		vg.Status.PhysicalVolumes[i].Major = pv.Major
+	}
 
+	if vg.Status.ExtentSize, err = convertSizeToQuantity(lvm.ExtentSize); err != nil {
+		return err
+	}
+	if vg.Status.Size, err = convertSizeToQuantity(lvm.Size); err != nil {
+		return err
+	}
+	if vg.Status.Free, err = convertSizeToQuantity(lvm.Free); err != nil {
+		return err
+	}
 	vg.Status.Name = string(lvm.Name)
 	vg.Status.UUID = lvm.UUID
 	vg.Status.SysID = lvm.SysID
-	vg.Status.VGAttributes = lvm.Attr.String()
+	vg.Status.Attributes = lvm.Attr.String()
 	vg.Status.Tags = lvm.Tags
-	vg.Status.ExtentSize, err = convertSizeToQuantity(lvm.ExtentSize)
-	if err != nil {
-		return err
-	}
 	vg.Status.ExtentCount = lvm.ExtentCount
-	vg.Status.SeqNo = lvm.SeqNo
-	vg.Status.Size, err = convertSizeToQuantity(lvm.Size)
-	if err != nil {
-		return err
-	}
-	vg.Status.Free, err = convertSizeToQuantity(lvm.Free)
-	if err != nil {
-		return err
-	}
-	vg.Status.PvCount = lvm.PvCount
-	vg.Status.MissingPVCount = lvm.MissingPVCount
-	vg.Status.MaxPv = lvm.MaxPv
-	vg.Status.LvCount = lvm.LvCount
-	vg.Status.MaxLv = lvm.MaxLv
-	vg.Status.SnapCount = lvm.SnapCount
-	vg.Status.MDACount = lvm.MDACount
-	vg.Status.MDAUsedCount = lvm.MDAUsedCount
+	vg.Status.SequenceNumber = lvm.SeqNo
+
+	vg.Status.PhysicalVolumeCount = lvm.PvCount
+	vg.Status.MissingPhysicalVolumeCount = lvm.MissingPVCount
+	vg.Status.MaximumPhysicalVolumes = lvm.MaxPv
+	vg.Status.LogicalVolumeCount = lvm.LvCount
+	vg.Status.MaximumLogicalVolumes = lvm.MaxLv
+	vg.Status.SnapshotCount = lvm.SnapCount
+	vg.Status.MetadataAreaCount = lvm.MDACount
+	vg.Status.MetadataAreaUsedCount = lvm.MDAUsedCount
 	return nil
 }

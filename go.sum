@@ -65,8 +65,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 h1:YBftPWNWd4WwGqtY2yeZL2ef8rH
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0/go.mod h1:YN5jB8ie0yfIUg6VvR9Kz84aCaG7AsGZnLjhHbUqwPg=
 github.com/imdario/mergo v0.3.6 h1:xTNEAn+kxVO7dTZGu0CegyqKZmoWFI0rF8UxjlB2d28=
 github.com/imdario/mergo v0.3.6/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
-github.com/jakobmoellerdev/lvm2go v0.0.0-20240731122836-098215ab250c h1:KwiGdg/WTq9UAfnsBr2VVKk7Dlqxw7VK596U57p+Rnw=
-github.com/jakobmoellerdev/lvm2go v0.0.0-20240731122836-098215ab250c/go.mod h1:Dl1zs8Wkfe/xb/D4lo1NBkGievH9JD7KvuAQ3C2WI2k=
+github.com/jakobmoellerdev/lvm2go v0.0.0-20240731190417-e933ca9524da h1:wmlss62tcIcWKm9AVyrGixEwpGIrKVsy6Dyc4bb6rpg=
+github.com/jakobmoellerdev/lvm2go v0.0.0-20240731190417-e933ca9524da/go.mod h1:Dl1zs8Wkfe/xb/D4lo1NBkGievH9JD7KvuAQ3C2WI2k=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=

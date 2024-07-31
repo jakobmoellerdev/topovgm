@@ -177,7 +177,8 @@ var _ = Describe("VolumeGroup Controller", func() {
 		ctx := context.Background()
 		client := lvm2go.NewClient()
 
-		loop := SetupLoopbackDevice()
+		loopA := SetupLoopbackDevice()
+		loopB := SetupLoopbackDevice()
 
 		BeforeEach(func() {
 			By("creating VolumeGroup resource")
@@ -192,7 +193,10 @@ var _ = Describe("VolumeGroup Controller", func() {
 						MatchLSBLK: []topolvmv1alpha1.LSBLKSelectorRequirement{{
 							Key:      topolvmv1alpha1.LSBLKSelectorKey(lsblk.ColumnPath),
 							Operator: topolvmv1alpha1.PVSelectorOpIn,
-							Values:   []string{loop().Device()},
+							Values: []string{
+								loopA().Device(),
+								loopB().Device(),
+							},
 						}},
 					}},
 					Tags: []string{
@@ -226,7 +230,7 @@ var _ = Describe("VolumeGroup Controller", func() {
 			}
 		})
 
-		It("should successfully reconcile the CR", func() {
+		It("should recover from a removal of a device", func() {
 			By("reconciling the created CR", func() {
 				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: typeNamespacedName,
@@ -267,21 +271,32 @@ var _ = Describe("VolumeGroup Controller", func() {
 				Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupSynced))
 			})
 
-			By("Delete the VolumeGroup CR and make it drop the finalizer", func() {
-				resource := &topolvmv1alpha1.VolumeGroup{}
-				err := k8sClient.Get(ctx, typeNamespacedName, resource)
-				if errors.IsNotFound(err) {
-					return
-				}
-				Expect(err).ToNot(HaveOccurred())
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			By("removing a device outside of the controller that can no longer be picked up", func() {
+				Expect(loopB().Close()).To(Succeed())
 
-				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: typeNamespacedName,
 				})
-				Expect(err).NotTo(HaveOccurred())
 
-				Expect(k8sClient.Get(ctx, typeNamespacedName, &topolvmv1alpha1.VolumeGroup{})).Should(Satisfy(errors.IsNotFound))
+				Expect(err).To(Satisfy(lvm2go.IsLVMErrVGMissingPVs))
+
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+
+				Expect(resource.Status.PhysicalVolumeCount).To(BeEquivalentTo(2))
+			})
+
+			By("adjusting the DeviceLossSynchronizationPolicy to Remove", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				resource.Spec.DeviceLossSynchronizationPolicy = topolvmv1alpha1.DeviceLossSynchronizationPolicyRemoveMissing
+				Expect(k8sClient.Update(ctx, resource)).To(Succeed())
+
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})

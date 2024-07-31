@@ -119,6 +119,14 @@ type VolumeGroupSpec struct {
 	// If autoactivation is enabled on a VG, autoactivation can be disabled for individual LVs.
 	// If not specified, the host default is used.
 	AutoActivation *bool `json:"autoActivation,omitempty"`
+
+	// DeviceLossSynchronizationPolicy controls the behavior of the volume group when a device is lost or fails to be discovered after creation.
+	// +kubebuilder:default=Fail
+	DeviceLossSynchronizationPolicy DeviceLossSynchronizationPolicy `json:"deviceLossSynchronizationPolicy,omitempty"`
+
+	// DeviceRemovalVolumePolicy controls how the volume group will be synchronized when devices are removed from the desired set of physical volumes.
+	// +kubebuilder:default=MoveAndReduce
+	DeviceRemovalVolumePolicy DeviceRemovalVolumePolicy `json:"deviceRemovalVolumePolicy,omitempty"`
 }
 
 // VolumeGroupStatus defines the observed state of VolumeGroup in lvm2.
@@ -134,12 +142,13 @@ type VolumeGroupStatus struct {
 	// Corresponds to vg_sysid or vg_systemid.
 	SysID string `json:"sysid,omitempty"`
 
-	// PVs is a list of physical volumes in the volume group.
-	PVs []string `json:"pvs,omitempty"`
+	// PhysicalVolumes is a list of physical volumes in the volume group.
+	PhysicalVolumes []PhysicalVolumeStatus `json:"physicalVolumes,omitempty"`
 
-	// VGAttributes are various attributes of the volume group.
+	// Attributes are various attributes of the volume group.
 	// Corresponds to vg_attr.
-	VGAttributes string `json:"attributes,omitempty"`
+	Attributes string `json:"attributes,omitempty"`
+
 	// Tags are tags applied to the volume group.
 	// Corresponds to vg_tags.
 	Tags []string `json:"tags,omitempty"`
@@ -151,9 +160,10 @@ type VolumeGroupStatus struct {
 	// Corresponds to vg_extent_count.
 	ExtentCount int64 `json:"extentCount,omitempty"`
 
-	// SeqNo is the revision number of internal metadata.
+	// SequenceNumber is the revision number of internal metadata.
+	// It is similar to the ResourceVersion, but on the Host System.
 	// Corresponds to vg_seqno.
-	SeqNo int64 `json:"seqno,omitempty"`
+	SequenceNumber int64 `json:"seqno,omitempty"`
 
 	// Size is the total size of the volume group.
 	// Corresponds to vg_size.
@@ -162,36 +172,106 @@ type VolumeGroupStatus struct {
 	// Corresponds to vg_free.
 	Free *resource.Quantity `json:"free,omitempty"`
 
-	// PvCount is the number of physical volumes in the volume group.
+	// PhysicalVolumeCount is the number of physical volumes in the volume group.
 	// Corresponds to pv_count.
-	PvCount int64 `json:"pvCount,omitempty"`
-	// MissingPVCount is the number of physical volumes in the volume group which are missing.
+	PhysicalVolumeCount int64 `json:"physicalVolumeCount,omitempty"`
+	// MissingPhysicalVolumeCount is the number of physical volumes in the volume group which are missing.
 	// Corresponds to vg_missing_pv_count.
-	MissingPVCount int64 `json:"missingPvCount,omitempty"`
-	// MaxPv is the maximum number of physical volumes allowed in the volume group.
+	MissingPhysicalVolumeCount int64 `json:"missingPhysicalVolumeCount,omitempty"`
+	// MaximumPhysicalVolumes is the maximum number of physical volumes allowed in the volume group.
 	// Corresponds to max_pv.
-	MaxPv int64 `json:"maxPv,omitempty"`
+	MaximumPhysicalVolumes int64 `json:"maximumPhysicalVolumes,omitempty"`
 
-	// LvCount is the number of logical volumes in the volume group.
+	// LogicalVolumeCount is the number of logical volumes in the volume group.
 	// Corresponds to lv_count.
-	LvCount int64 `json:"lvCount,omitempty"`
-	// MaxLv is the maximum number of logical volumes allowed in the volume group.
+	LogicalVolumeCount int64 `json:"logicalVolumeCount,omitempty"`
+	// MaximumLogicalVolumes is the maximum number of logical volumes allowed in the volume group.
 	// Corresponds to max_lv.
-	MaxLv int64 `json:"maxLv,omitempty"`
+	MaximumLogicalVolumes int64 `json:"maximumLogicalVolumes,omitempty"`
 
-	// SnapCount is the number of snapshots in the volume group.
+	// SnapshotCount is the number of snapshots in the volume group.
 	// Corresponds to snap_count.
-	SnapCount int64 `json:"snapCount,omitempty"`
+	SnapshotCount int64 `json:"snapshotCount,omitempty"`
 
-	// MDACount is the number of metadata areas on the volume group.
+	// MetadataAreaCount is the number of metadata areas on the volume group.
 	// Corresponds to vg_mda_count.
-	MDACount int64 `json:"mdaCount,omitempty"`
-	// MDAUsedCount is the number of metadata areas in use on the volume group.
+	MetadataAreaCount int64 `json:"metadataAreaCount,omitempty"`
+	// MetadataAreaUsedCount is the number of metadata areas in use on the volume group.
 	// Corresponds to vg_mda_used_count.
-	MDAUsedCount int64 `json:"mdaUsedCount,omitempty"`
+	MetadataAreaUsedCount int64 `json:"metadataAreaUsedCount,omitempty"`
 
 	// Conditions represent the latest available observations of an object's state.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+type PhysicalVolumeStatus struct {
+	// Name is the name of the physical volume.
+	// Corresponds to pv_name.
+	Name string `json:"name"`
+
+	// UUID is the UUID of the physical volume.
+	// Corresponds to pv_uuid.
+	UUID string `json:"uuid,omitempty"`
+
+	// DeviceSize is the size of the physical volume.
+	// Corresponds to dev_size.
+	DeviceSize *resource.Quantity `json:"deviceSize"`
+
+	// Attributes is the attributes of the physical volume.
+	// Corresponds to pv_attr.
+	Attributes string `json:"attributes"`
+
+	// Major is the major number of the physical volume.
+	// Corresponds to pv_major.
+	Major int64 `json:"major"`
+
+	// Minor is the minor number of the physical volume.
+	// Corresponds to pv_minor.
+	Minor int64 `json:"minor"`
+
+	// Size is the size of the physical volume.
+	// Corresponds to pv_size.
+	Size *resource.Quantity `json:"size"`
+
+	// Free is the amount of free space in the physical volume.
+	// Corresponds to pv_free.
+	Free *resource.Quantity `json:"free"`
+
+	// Used is the amount of used space in the physical volume.
+	// Corresponds to pv_used.
+	Used *resource.Quantity `json:"used"`
+
+	// MetadataAreaFree is the amount of free space in the metadata area of the physical volume.
+	// Corresponds to pv_mda_free.
+	MetadataAreaFree *resource.Quantity `json:"metadataAreaFree"`
+
+	// MetadataAreaSize is the size of the metadata area of the physical volume.
+	// Corresponds to pv_mda_size.
+	MetadataAreaSize *resource.Quantity `json:"metadataAreaSize"`
+
+	// PhysicalExtentStart is the offset to the start of data on the underlying device.
+	// Corresponds to pe_start.
+	PhysicalExtentStart *resource.Quantity `json:"physicalExtentStart"`
+
+	// MetadataAreaCount is the number of metadata areas on the physical volume.
+	// Corresponds to pv_mda_count.
+	MetadataAreaCount int64 `json:"metadataAreaCount"`
+
+	// MetadataAreaUsedCount is the number of metadata areas in use on the physical volume.
+	// Corresponds to pv_mda_used_count.
+	MetadataAreaUsedCount int64 `json:"metadataAreaUsedCount"`
+
+	// Tags are tags applied to the physical volume.
+	// Corresponds to pv_tags.
+	Tags []string `json:"tags,omitempty"`
+
+	// DeviceID is the device ID of the physical volume.
+	// Corresponds to pv_device_id.
+	DeviceID string `json:"deviceID,omitempty"`
+
+	// DeviceIDType is device ID type of the physical volume.
+	// Corresponds to pv_device_id_type.
+	DeviceIDType string `json:"deviceIDType,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -285,10 +365,41 @@ type LSBLKSelectorKey string
 type AllocationPolicy string
 
 const (
-	Contiguous  AllocationPolicy = "contiguous"    // See AllocationPolicy for more information.
-	Normal      AllocationPolicy = "normal"        // See AllocationPolicy for more information.
-	Cling       AllocationPolicy = "cling"         // See AllocationPolicy for more information.
-	ClingByTags AllocationPolicy = "cling_by_tags" // See AllocationPolicy for more information.
-	Anywhere    AllocationPolicy = "anywhere"      // See AllocationPolicy for more information.
-	Inherit     AllocationPolicy = "inherit"       // See AllocationPolicy for more information.
+	Contiguous  AllocationPolicy = "Contiguous"  // See AllocationPolicy for more information.
+	Normal      AllocationPolicy = "Normal"      // See AllocationPolicy for more information.
+	Cling       AllocationPolicy = "Cling"       // See AllocationPolicy for more information.
+	ClingByTags AllocationPolicy = "ClingByTags" // See AllocationPolicy for more information.
+	Anywhere    AllocationPolicy = "Anywhere"    // See AllocationPolicy for more information.
+	Inherit     AllocationPolicy = "Inherit"     // See AllocationPolicy for more information.
+)
+
+// DeviceLossSynchronizationPolicy controls the behavior of the volume group when a device is lost or fails to be discovered after creation.
+// If not specified, DeviceLossSynchronizationPolicyFail is used, which causes the volume group to fail synchronization until either
+// manual remediation occurs or all devices are rediscovered.
+// If set to DeviceLossSynchronizationPolicyRemoveMissing instead, all missing PVs are removed from the VG, if there are no LVs allocated on them.
+// If set to DeviceLossSynchronizationPolicyForceRemoveMissing, all missing PVs are removed from the VG, even if there are (partial) LVs allocated on them.
+// In this case, any LVs and dependent snapshots that were partly on the missing disks are removed completely,
+// including those parts on disks that are still present.
+// If LVs spanned several disks, including ones that are lost, salvaging some data first may be possible by activating LVs in partial mode.
+type DeviceLossSynchronizationPolicy string
+
+const (
+	DeviceLossSynchronizationPolicyFail               DeviceLossSynchronizationPolicy = "Fail"        // See DeviceLossSynchronizationPolicy for more information.
+	DeviceLossSynchronizationPolicyRemoveMissing      DeviceLossSynchronizationPolicy = "Remove"      // See DeviceLossSynchronizationPolicy for more information.
+	DeviceLossSynchronizationPolicyForceRemoveMissing DeviceLossSynchronizationPolicy = "ForceRemove" // See DeviceLossSynchronizationPolicy for more information.
+)
+
+// DeviceRemovalVolumePolicy controls how the volume group will be synchronized when devices are removed from the desired set of physical volumes.
+// If set to DeviceRemovalVolumePolicyMoveAndReduce, all extents will be attempted to be moved to the remaining physical volumes before reducing.
+// This can fail if there are not sufficient extents available in the leftover devices.
+// If set to DeviceRemovalVolumePolicyReduce, the volume group will be reduced immediately,
+// but the process can fail if there are still in use logical volumes on the removed physical volumes.
+// If set to DeviceRemovalVolumePolicyForceReduce, the volume group will be reduced immediately,
+// even if there are still logical volume extents in use on the removed physical volumes. This can lead to data loss.
+type DeviceRemovalVolumePolicy string
+
+const (
+	DeviceRemovalVolumePolicyMoveAndReduce DeviceRemovalVolumePolicy = "MoveAndReduce" // See DeviceRemovalVolumePolicy for more information.
+	DeviceRemovalVolumePolicyReduce        DeviceRemovalVolumePolicy = "Reduce"        // See DeviceRemovalVolumePolicy for more information.
+	DeviceRemovalVolumePolicyForceReduce   DeviceRemovalVolumePolicy = "ForceReduce"   // See DeviceRemovalVolumePolicy for more information.
 )

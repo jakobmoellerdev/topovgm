@@ -80,7 +80,7 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if !vg.GetDeletionTimestamp().IsZero() {
 		logger.V(1).Info("removing volume group from host")
-		if err := r.LVM.VGRemove(ctx, name); err != nil && !lvm2go.IsLVMNotFound(err) {
+		if err := r.LVM.VGRemove(ctx, name); err != nil && !lvm2go.IsLVMErrNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to remove volume group: %w", err)
 		}
 		if updated := controllerutil.RemoveFinalizer(vg, VolumeGroupFinalizer); updated {

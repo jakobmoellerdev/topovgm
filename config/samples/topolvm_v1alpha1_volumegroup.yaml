@@ -1,9 +1,6 @@
 apiVersion: topolvm.io/v1alpha1
 kind: VolumeGroup
 metadata:
-  labels:
-    app.kubernetes.io/name: topovgm
-    app.kubernetes.io/managed-by: kustomize
   name: vg1
 spec:
   nodeName: crc

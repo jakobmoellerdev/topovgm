@@ -1,6 +1,8 @@
-# topovgm
+# TopoVGM
 
-TopoVGM (Topology Volume Group Manager) is a Kubernetes Operator that manages the creation and deletion of Logical Volume Manager (LVM) Volume Group on Kubernetes nodes as a daemon. It is intended to be used in conjunction with the [TopoLVM](https://github.com/topolvm/topolvm) project, but can be used independently as well. It's heart lies within its ability to establish a syncing procedure for volume groups across multiple nodes in a Kubernetes cluster.
+TopoVGM (Topology Volume Group Manager) is a Kubernetes Operator that manages the creation and deletion of Logical Volume Manager (LVM) Volume Group on Kubernetes nodes as a daemon. It is intended to be used in conjunction with the [TopoLVM](https://github.com/topolvm/topolvm) project, but can be used independently as well. Its heart lies within its ability to establish a syncing procedure for volume groups across multiple nodes in a Kubernetes cluster.
+
+My final goal is to contribute this project to the TopoLVM project community as I believe that is where it can mature into a more robust and feature-rich project.
 
 ## Description
 
@@ -35,6 +37,88 @@ spec:
 
 While this is a simple example, the `VolumeGroup` CRD can be customized to match any specific requirements that you may have.
 Almost all of the vgcreate / vgchange commands you are used to from the command line can be represented in the `VolumeGroup` CRD.
+
+You will notice that the VolumeGroup exposes a significant Status that can be used both for extension of functionality, debugging or monitoring. Here is an example for that
+
+```yaml
+apiVersion: topolvm.io/v1alpha1
+kind: VolumeGroup
+metadata:
+  finalizers:
+  - topolvm.io/volumegroup-removal-on-node
+  generation: 1
+  name: vg1
+  namespace: default
+  resourceVersion: "175375"
+  uid: 2903b9fa-5f09-41ec-b5f6-dcb60fe7e261
+spec:
+  allocationPolicy: normal
+  deviceLossSynchronizationPolicy: Fail
+  deviceRemovalVolumePolicy: MoveAndReduce
+  nodeName: crc
+  physicalExtentSize: 4Mi
+  physicalVolumeSelector:
+  - matchLSBLK:
+    - key: TYPE
+      operator: In
+      values:
+      - loop
+  tags:
+  - topovgm
+  zero: true
+status:
+  attributes: wz--n-
+  conditions:
+  - lastTransitionTime: "2024-07-31T20:05:51Z"
+    message: The volume group is present on the node and discoverable in the lvm2 subsystem.
+    observedGeneration: 1
+    reason: VolumeGroupSynced
+    status: "True"
+    type: VolumeGroupSyncedOnNode
+  extentCount: 510
+  extentSize: "4194304"
+  free: "2139095040"
+  metadataAreaCount: 2
+  metadataAreaUsedCount: 2
+  name: 2903b9fa-5f09-41ec-b5f6-dcb60fe7e261
+  physicalVolumeCount: 2
+  physicalVolumes:
+  - attributes: a--
+    deviceID: /lblock0
+    deviceSize: "1073741824"
+    free: "1069547520"
+    major: 7
+    metadataAreaCount: 1
+    metadataAreaFree: "520192"
+    metadataAreaSize: "1044480"
+    metadataAreaUsedCount: 1
+    minor: 0
+    name: /dev/loop0
+    physicalExtentStart: "1048576"
+    size: "1069547520"
+    used: "0"
+    uuid: 5mzDdg-Yn5e-lLbQ-9Emj-Syzg-seVC-BJdHz0
+  - attributes: a--
+    deviceID: /lblock1
+    deviceSize: "1073741824"
+    free: "1069547520"
+    major: 7
+    metadataAreaCount: 1
+    metadataAreaFree: "520192"
+    metadataAreaSize: "1044480"
+    metadataAreaUsedCount: 1
+    minor: 1
+    name: /dev/loop1
+    physicalExtentStart: "1048576"
+    size: "1069547520"
+    used: "0"
+    uuid: X1ksoF-9xV4-ECUU-Ygvz-YfK2-fYeb-xMLv6A
+  seqno: 1
+  size: "2139095040"
+  tags:
+  - topovgm
+  uuid: izMq2s-Sgbo-JOfd-kY4a-lDA1-j1kQ-iF7rFL
+```
 
 
 ## Getting Started
@@ -123,7 +207,17 @@ kubectl apply -f https://raw.githubusercontent.com/<org>/topovgm/<tag or branch>
 ```
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+
+This project is in early stages of development and is open to contributions of any kind. I am looking for help in the following areas:
+- Testing
+- Documentation
+- Code Contributions
+- Bug Reports
+- Feature Requests
+- Feedback
+- Code Reviews
+
+Please feel free to open an issue or a pull request if you would like to contribute.
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
