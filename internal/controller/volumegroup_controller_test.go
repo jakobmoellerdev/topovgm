@@ -30,6 +30,7 @@ import (
 	"github.com/jakobmoellerdev/lvm2go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/topolvm/topovgm/internal/lsblk"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +42,7 @@ import (
 )
 
 var _ = Describe("VolumeGroup Controller", func() {
-	Context("When reconciling a resource", func() {
+	Context("happy path", func() {
 		const resourceName = "test-resource"
 		const resourceNamespace = "default"
 		const nodeName = "test-node"
@@ -65,9 +66,13 @@ var _ = Describe("VolumeGroup Controller", func() {
 				},
 				Spec: topolvmv1alpha1.VolumeGroupSpec{
 					NodeName: nodeName,
-					PVs: []string{
-						loop().Device(),
-					},
+					PhysicalVolumeSelector: topolvmv1alpha1.PhysicalVolumeSelector{{
+						MatchLSBLK: []topolvmv1alpha1.LSBLKSelectorRequirement{{
+							Key:      topolvmv1alpha1.LSBLKSelectorKey(lsblk.ColumnPath),
+							Operator: topolvmv1alpha1.PVSelectorOpIn,
+							Values:   []string{loop().Device()},
+						}},
+					}},
 					Tags: []string{
 						ValidLVMTag(GinkgoT().Name()),
 					},
@@ -121,7 +126,9 @@ var _ = Describe("VolumeGroup Controller", func() {
 			})
 
 			By("having a lvm2 volume group created", func() {
-				vg, err := client.VG(ctx, lvm2go.VolumeGroupName(resourceName))
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				vg, err := client.VG(ctx, lvm2go.VolumeGroupName(resource.Status.Name))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vg).NotTo(BeNil())
 			})
@@ -135,7 +142,129 @@ var _ = Describe("VolumeGroup Controller", func() {
 				)
 				Expect(nodeCondition).NotTo(BeNil())
 				Expect(nodeCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupCreated))
+				Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupSynced))
+			})
+
+			By("Delete the VolumeGroup CR and make it drop the finalizer", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				err := k8sClient.Get(ctx, typeNamespacedName, resource)
+				if errors.IsNotFound(err) {
+					return
+				}
+				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(k8sClient.Get(ctx, typeNamespacedName, &topolvmv1alpha1.VolumeGroup{})).Should(Satisfy(errors.IsNotFound))
+			})
+		})
+	})
+
+	Context("failure path - external modifications", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+		const nodeName = "test-node"
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		ctx := context.Background()
+		client := lvm2go.NewClient()
+
+		loop := SetupLoopbackDevice()
+
+		BeforeEach(func() {
+			By("creating VolumeGroup resource")
+			resource := &topolvmv1alpha1.VolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: resourceNamespace,
+				},
+				Spec: topolvmv1alpha1.VolumeGroupSpec{
+					NodeName: nodeName,
+					PhysicalVolumeSelector: topolvmv1alpha1.PhysicalVolumeSelector{{
+						MatchLSBLK: []topolvmv1alpha1.LSBLKSelectorRequirement{{
+							Key:      topolvmv1alpha1.LSBLKSelectorKey(lsblk.ColumnPath),
+							Operator: topolvmv1alpha1.PVSelectorOpIn,
+							Values:   []string{loop().Device()},
+						}},
+					}},
+					Tags: []string{
+						ValidLVMTag(GinkgoT().Name()),
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		})
+		AfterEach(func() {
+			resource := &topolvmv1alpha1.VolumeGroup{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			if errors.IsNotFound(err) {
+				return
+			}
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoLogr.Info("summarizing the resource", "resource", resource)
+			encoder := json.NewEncoder(GinkgoWriter)
+			encoder.SetIndent("", "  ")
+			Expect(encoder.Encode(resource)).To(Succeed())
+		})
+
+		var controllerReconciler *VolumeGroupReconciler
+		BeforeEach(func() {
+			By("initializing the controller reconciler")
+			controllerReconciler = &VolumeGroupReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				LVM:      client,
+				NodeName: nodeName,
+			}
+		})
+
+		It("should successfully reconcile the CR", func() {
+			By("reconciling the created CR", func() {
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			By("having set the volume group finalizer", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				Expect(resource.GetFinalizers()).To(ContainElement(VolumeGroupFinalizer))
+			})
+
+			By("reconciling the created CR again to sync it with the lvm state and triggering a condition", func() {
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			By("having a lvm2 volume group created", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				vg, err := client.VG(ctx, lvm2go.VolumeGroupName(resource.Status.Name))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vg).NotTo(BeNil())
+			})
+
+			By("having a VolumeGroupSyncedOnNode condition set to true", func() {
+				resource := &topolvmv1alpha1.VolumeGroup{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, resource)).To(Succeed())
+				nodeCondition := meta.FindStatusCondition(
+					resource.Status.Conditions,
+					ConditionTypeVolumeGroupSyncedOnNode,
+				)
+				Expect(nodeCondition).NotTo(BeNil())
+				Expect(nodeCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(nodeCondition.Reason).To(Equal(ReasonVolumeGroupSynced))
 			})
 
 			By("Delete the VolumeGroup CR and make it drop the finalizer", func() {

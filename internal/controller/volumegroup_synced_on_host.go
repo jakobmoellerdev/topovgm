@@ -10,8 +10,8 @@ import (
 const (
 	// ConditionTypeVolumeGroupSyncedOnNode is a condition type that indicates whether the volume group is present on the host node.
 	ConditionTypeVolumeGroupSyncedOnNode = "VolumeGroupSyncedOnNode"
-	ReasonVolumeGroupCreated             = "VolumeGroupCreated"
-	ReasonVolumeGroupCreationFailed      = "VolumeGroupCreationFailed"
+	ReasonVolumeGroupSynced              = "VolumeGroupSynced"
+	ReasonVolumeGroupSyncFailed          = "VolumeGroupSyncFailed"
 	ReasonVolumeGroupSyncPending         = "VolumeGroupSyncPending"
 	MessageVolumeGroupSyncPending        = "The volume group is waiting to be synchronized with the node."
 	MessageVolumeGroupCreated            = "The volume group is present on the node and discoverable in the lvm2 subsystem."
@@ -32,7 +32,7 @@ func SetSyncedOnHostDefault(conditions *[]metav1.Condition, generation int64) {
 
 func SetSyncedOnHostCreationFailed(conditions *[]metav1.Condition, generation int64, err error) {
 	condition := *SyncedOnHost.DeepCopy()
-	condition.Reason = ReasonVolumeGroupCreationFailed
+	condition.Reason = ReasonVolumeGroupSyncFailed
 	condition.Message = fmt.Sprintf("volume group creation failed: %s", err.Error())
 	condition.ObservedGeneration = generation
 	meta.SetStatusCondition(conditions, condition)
@@ -41,7 +41,7 @@ func SetSyncedOnHostCreationFailed(conditions *[]metav1.Condition, generation in
 func SetSyncedOnHostCreationOK(conditions *[]metav1.Condition, generation int64) {
 	condition := *SyncedOnHost.DeepCopy()
 	condition.Status = metav1.ConditionTrue
-	condition.Reason = ReasonVolumeGroupCreated
+	condition.Reason = ReasonVolumeGroupSynced
 	condition.Message = MessageVolumeGroupCreated
 	condition.ObservedGeneration = generation
 	meta.SetStatusCondition(conditions, condition)

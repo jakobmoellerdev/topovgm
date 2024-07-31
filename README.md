@@ -1,8 +1,41 @@
 # topovgm
-// TODO(user): Add simple overview of use/purpose
+
+TopoVGM (Topology Volume Group Manager) is a Kubernetes Operator that manages the creation and deletion of Logical Volume Manager (LVM) Volume Group on Kubernetes nodes as a daemon. It is intended to be used in conjunction with the [TopoLVM](https://github.com/topolvm/topolvm) project, but can be used independently as well. It's heart lies within its ability to establish a syncing procedure for volume groups across multiple nodes in a Kubernetes cluster.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+TopoVGM is a Kubernetes Operator that manages the creation and deletion of Logical Volume Manager (LVM) Volume Group on Kubernetes nodes as a daemon.
+
+To do this it makes of a Custom Resource Definition (CRD) called `VolumeGroup` which is a representation of the Volume Group that needs to be created on the node. The operator watches for the creation of this CRD and then creates the Volume Group on the node.
+
+The operator also watches for the deletion of the CRD and then deletes the Volume Group on the node.
+
+Here is an example of the `VolumeGroup` CRD that will attempt to use all loop devices on the node as well as a custom storage device:
+
+```yaml
+apiVersion: topolvm.io/v1alpha1
+kind: VolumeGroup
+metadata:
+  labels:
+  name: vg
+spec:
+  nodeName: my-node
+  physicalVolumeSelector:
+    - matchLSBLK:
+        - key: TYPE
+          operator: In
+          values:
+            - loop
+    - matchLSBLK:
+        - key: PATH
+          operator: In
+          values:
+            - /dev/sda
+```
+
+While this is a simple example, the `VolumeGroup` CRD can be customized to match any specific requirements that you may have.
+Almost all of the vgcreate / vgchange commands you are used to from the command line can be represented in the `VolumeGroup` CRD.
+
 
 ## Getting Started
 

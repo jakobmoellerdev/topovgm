@@ -20,19 +20,15 @@ func TestDevicesMatchingSelector(t *testing.T) {
 		}
 	}()
 
-	selector := v1alpha1.PhysicalVolumeSelector{
-		PVSelectorTerms: []v1alpha1.PVSelectorTerm{
+	selector := v1alpha1.PhysicalVolumeSelector{{
+		MatchLSBLK: []v1alpha1.LSBLKSelectorRequirement{
 			{
-				MatchLSBLK: []v1alpha1.LSBLKSelectorRequirement{
-					{
-						Key:      v1alpha1.LSBLKSelectorKey(lsblk.ColumnPath),
-						Operator: v1alpha1.PVSelectorOpIn,
-						Values:   []string{device.Device()},
-					},
-				},
+				Key:      v1alpha1.LSBLKSelectorKey(lsblk.ColumnPath),
+				Operator: v1alpha1.PVSelectorOpIn,
+				Values:   []string{device.Device()},
 			},
 		},
-	}
+	}}
 
 	devices, err := DevicesMatchingSelector(context.Background(), selector)
 	if err != nil {
