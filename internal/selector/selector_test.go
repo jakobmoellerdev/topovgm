@@ -20,7 +20,7 @@ func TestDevicesMatchingSelector(t *testing.T) {
 		}
 	}()
 
-	selector := v1alpha1.PVSelector{
+	selector := v1alpha1.PhysicalVolumeSelector{
 		PVSelectorTerms: []v1alpha1.PVSelectorTerm{
 			{
 				MatchLSBLK: []v1alpha1.LSBLKSelectorRequirement{

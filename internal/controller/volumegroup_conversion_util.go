@@ -11,31 +11,46 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func nameOnNode(vg *v1alpha1.VolumeGroup) lvm2go.VolumeGroupName {
-	name := lvm2go.VolumeGroupName(vg.GetName())
-	if vg.Spec.NameOnNode != nil {
-		name = lvm2go.VolumeGroupName(*vg.Spec.NameOnNode)
+// getNameOnNode returns the VolumeGroupName based on the NameOnNode field in the VolumeGroup spec.
+// If NameOnNode is not set, it falls back to using the UID of the VolumeGroup.
+//
+// Parameters:
+// - vg: The VolumeGroup object containing the spec with the NameOnNode field.
+//
+// Returns:
+// - The VolumeGroupName derived from either the NameOnNode field or the UID.
+func getNameOnNode(vg *v1alpha1.VolumeGroup) lvm2go.VolumeGroupName {
+	if vg.Spec.NameOnNode == nil {
+		return lvm2go.VolumeGroupName(vg.GetUID())
 	}
-	return name
+	return lvm2go.VolumeGroupName(*vg.Spec.NameOnNode)
 }
 
-func pvsFromSpec(ctx context.Context, vg *v1alpha1.VolumeGroup) ([]lvm2go.PhysicalVolumeName, error) {
-	desiredState := vg.Spec.PVs
-	if len(desiredState) == 0 {
-		if fromSelector, err := selector.DevicesMatchingSelector(ctx, vg.Spec.PVSelector); err != nil {
-			return nil, fmt.Errorf("could not get devices matching selector: %w", err)
-		} else {
-			desiredState = fromSelector
-		}
+// getPhysicalVolumeNames retrieves the physical volume names from the VolumeGroup spec based on the provided PhysicalVolumeSelector.
+// It uses selector.DevicesMatchingSelector to get the devices matching the selector and maps them to PhysicalVolumeName.
+//
+// Parameters:
+// - ctx: The context for the operation.
+// - vg: The VolumeGroup object containing the spec with the PhysicalVolumeSelector.
+//
+// Returns:
+// - A slice of PhysicalVolumeName containing the names of the physical volumes.
+// - An error if there was an issue retrieving the devices matching the selector.
+func getPhysicalVolumeNames(ctx context.Context, vg *v1alpha1.VolumeGroup) ([]lvm2go.PhysicalVolumeName, error) {
+	fromSelector, err := selector.DevicesMatchingSelector(ctx, vg.Spec.PhysicalVolumeSelector)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not get devices matching selector: %w", err)
 	}
-	return utils.Map(desiredState, func(pv string) lvm2go.PhysicalVolumeName {
+
+	return utils.Map(fromSelector, func(pv string) lvm2go.PhysicalVolumeName {
 		return lvm2go.PhysicalVolumeName(pv)
 	}), nil
 }
 
 func convertToVGCreateOptions(ctx context.Context, vg *v1alpha1.VolumeGroup) (*lvm2go.VGCreateOptions, error) {
 	opts := &lvm2go.VGCreateOptions{
-		VolumeGroupName: nameOnNode(vg),
+		VolumeGroupName: getNameOnNode(vg),
 	}
 
 	if vg.Spec.Tags != nil {
@@ -43,7 +58,7 @@ func convertToVGCreateOptions(ctx context.Context, vg *v1alpha1.VolumeGroup) (*l
 	}
 
 	var err error
-	opts.PhysicalVolumeNames, err = pvsFromSpec(ctx, vg)
+	opts.PhysicalVolumeNames, err = getPhysicalVolumeNames(ctx, vg)
 	if err != nil {
 		return nil, fmt.Errorf("could not get physical volume names from spec: %w", err)
 	}
@@ -60,12 +75,44 @@ func convertToVGCreateOptions(ctx context.Context, vg *v1alpha1.VolumeGroup) (*l
 		opts.AllocationPolicy = lvm2go.AllocationPolicy(*vg.Spec.AllocationPolicy)
 	}
 
+	if vols := vg.Spec.MaximumPhysicalVolumes; vols != nil {
+		opts.MaximumPhysicalVolumes = lvm2go.MaximumPhysicalVolumes(*vols)
+	}
+
+	if vols := vg.Spec.MaximumLogicalVolumes; vols != nil {
+		opts.MaximumLogicalVolumes = lvm2go.MaximumLogicalVolumes(*vols)
+	}
+
 	if vg.Spec.PhysicalExtentSize != nil {
 		physicalExtentSize, err := convertQuantityToSize(vg.Spec.PhysicalExtentSize)
 		if err != nil {
 			return nil, err
 		}
 		opts.PhysicalExtentSize = lvm2go.PhysicalExtentSize(physicalExtentSize)
+	}
+
+	if vg.Spec.MetadataSize != nil {
+		metadataSize, err := convertQuantityToSize(vg.Spec.MetadataSize)
+		if err != nil {
+			return nil, err
+		}
+		opts.MetadataSize = lvm2go.MetadataSize(metadataSize)
+	}
+
+	if vg.Spec.DataAlignment != nil {
+		dataAlignment, err := convertQuantityToSize(vg.Spec.DataAlignment)
+		if err != nil {
+			return nil, err
+		}
+		opts.DataAlignment = lvm2go.DataAlignment(dataAlignment)
+	}
+
+	if vg.Spec.DataAlignmentOffset != nil {
+		dataAlignment, err := convertQuantityToSize(vg.Spec.DataAlignmentOffset)
+		if err != nil {
+			return nil, err
+		}
+		opts.DataAlignmentOffset = lvm2go.DataAlignmentOffset(dataAlignment)
 	}
 
 	if vg.Spec.Devices != nil {

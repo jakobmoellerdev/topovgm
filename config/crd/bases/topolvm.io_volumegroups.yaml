@@ -17,7 +17,10 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: VolumeGroup is the Schema for the volumegroups API
+        description: |-
+          VolumeGroup is the Schema for the volumegroups API.
+          It represents a logical grouping of physical volumes (PVs) and logical volumes (LVs) managed by LVM2.
+          This struct contains metadata about the volume group, its desired state (spec), and its observed state (status).
         properties:
           apiVersion:
             description: |-
@@ -37,16 +40,31 @@ spec:
           metadata:
             type: object
           spec:
-            description: VolumeGroupSpec defines the desired state of VolumeGroup
+            description: |-
+              VolumeGroupSpec defines the desired state of a VolumeGroup.
+              It contains various fields that specify how the volume group should be configured and managed.
             properties:
               allocationPolicy:
+                description: |-
+                  AllocationPolicy is the policy used to allocate extents in the volume group.
+                  If not set, the host default is used.
                 type: string
               autoActivation:
+                description: |-
+                  AutoActivation controls automatic activation on a VG or LV in that VG. Display the property with vgs or lvs "-o autoactivation".
+                  When the autoactivation property is disabled, the VG or LV will not be activated by a command doing autoactivation (vgchange, lvchange, or pvscan using -aay.)
+                  If autoactivation is disabled on a VG, no LVs will be autoactivated in that VG, and the LV autoactivation property has no effect.
+                  If autoactivation is enabled on a VG, autoactivation can be disabled for individual LVs.
+                  If not specified, the host default is used.
                 type: boolean
               dataAlignment:
                 anyOf:
                 - type: integer
                 - type: string
+                description: |-
+                  Align the start of a PV data area with a multiple of this number. To see the location of the first Physical Extent (PE) of an existing PV,
+                  use pvs -o +pe_start. In addition, it may be shifted by an alignment offset, see DataAlignmentOffset.
+                  Also specify an appropriate PhysicalExtentSize size when creating a VG.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
                 x-kubernetes-validations:
@@ -56,35 +74,82 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
+                description: Shift the start of the PV data area by this additional
+                  offset.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
                 x-kubernetes-validations:
                 - message: the data alignment offset cannot be changed once set
                   rule: self == oldSelf
               devices:
+                description: |-
+                  Restricts the devices that are visible and accessible to the command. Devices not listed will appear to be missing.
+                  This overrides the devices file.
+                  WARNING: older versions of lvm2 might not support this field
                 items:
                   type: string
                 type: array
-              devicesFile:
-                type: string
-              maximumLogicalVolumes:
-                type: integer
                 x-kubernetes-validations:
-                - message: the maximum amount of logical volumes cannot be changed
-                    once set
+                - message: the devices cannot be changed once set
                   rule: self == oldSelf
-              maximumPhysicalVolumes:
-                type: integer
+              devicesFile:
+                description: |-
+                  DevicesFile is a file listing devices that LVM should use.
+                  The file must exist in /etc/lvm/devices/ and is managed with the lvmdevices(8) command. This
+                  overrides the lvm.conf(5) devices/devicesfile and devices/use_devicesfile settings.
+                  WARNING: older versions of lvm2 might not support this field
+                type: string
                 x-kubernetes-validations:
-                - message: the maximum amount of physical volumes cannot be changed
-                    once set
+                - message: the devices file cannot be changed once set
+                  rule: self == oldSelf
+              maximumLogicalVolumes:
+                description: |-
+                  MaximumLogicalVolumes is the maximum number of logical volumes that can be created in the volume group.
+                  This limit is enforced in lvm2 and is changeable after the volume group is created.
+                  If set to 0 or omitted, there is no limit.
+                  This field can be used to prevent the creation of too many logical volumes in the volume group and
+                  should be set to a value that is appropriate for the use case if known in advance.
+                format: int64
+                type: integer
+              maximumPhysicalVolumes:
+                description: |-
+                  MaximumPhysicalVolumes is the maximum number of physical volumes that can be added to the volume group.
+                  This limit is enforced in lvm2 and is changeable after the volume group is created.
+                  If set to 0 or omitted, there is no limit.
+                  This field can be used to prevent the addition of too many physical volumes to the volume group and
+                  should be set to a value that is appropriate for the use case if known in advance.
+                  It can also be used to discover faulty device selection if used with a generous PhysicalVolumeSelector.
+                  In the case that the specified number of physical volumes is lower than the selected amount,
+                  the VolumeGroup creation will fail.
+                format: int64
+                type: integer
+              metadataSize:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  MetadataSize is the approximate amount of space used for each VG metadata area. The size may be rounded.
+                  If not set, the host default is used.
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
+                x-kubernetes-validations:
+                - message: the metadata size cannot be changed once set
                   rule: self == oldSelf
               nameOnNode:
+                description: |-
+                  NameOnNode is the name of the volume group on the node.
+                  If not specified, the name is generated by the controller from the UID of the VolumeGroup resource.
+                  If specified, the name must be unique among the volume groups on the node.
+                  Additionally, the name must be acceptable for use as a volume group name by the lvm2 subsystem.
+                  When changed, the volume group is renamed on the node.
+                  However, the actual name on the Node may be different from the NameOnNode field value if this fails.
+                  In this case, the actual Name is reported in VolumeGroupStatus.Name.
                 type: string
-                x-kubernetes-validations:
-                - message: the name on the node cannot be changed once set
-                  rule: self == oldSelf
               nodeName:
+                description: |-
+                  NodeName is the name of the node where the volume group should be created.
+                  This field is immutable because the volume group is not movable between nodes.
+                  The NodeName is equivalent to the name of the Node itself.
                 type: string
                 x-kubernetes-validations:
                 - message: the node cannot be changed once set
@@ -93,145 +158,163 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
+                description: |-
+                  PhysicalExtentSize is the physical extent size of pvs inside the volume group.
+                  The value must be either a power of 2 of at least 1 sector (where the sector size is the
+                  largest sector size of the PVs currently used in the VG), or at least 128Ki.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
-              pvSelector:
+                x-kubernetes-validations:
+                - message: the physical extent size cannot be changed once set, as
+                    it requires significant changes to the volume group. Once this
+                    value has been set, it is difficult to change without recreating
+                    the VG, unless no extents need moving. Before increasing the physical
+                    extent size, you might need to use lvresize, pvresize and/or pvmove
+                    so that everything fits. For example, every contiguous range of
+                    extents used in a LV must start and end on an extent boundary.
+                  rule: self == oldSelf
+              physicalVolumeSelector:
                 description: |-
-                  PVSelector represents the union of the results of one or more queries
-                  over a set of physical volume candidates; that is, it represents the OR of the selectors represented
-                  by the pv selector terms.
-                properties:
-                  pvSelectorTerms:
-                    description: Required. A list of node selector terms. The terms
-                      are ORed.
-                    items:
-                      description: |-
-                        A null or empty pv selector term matches no objects. The requirements of
-                        them are ANDed.
-                        The TopologySelectorTerm type implements a subset of the PVSelectorTerm.
-                      properties:
-                        matchLSBLK:
-                          description: A list of node selector requirements by node's
-                            labels.
-                          items:
+                  PhysicalVolumeSelector is a selector for physical volumes that should be included in the volume group.
+                  If empty, no physical volumes are included in the volume group.
+                  If the selector fails to include at least one device, the VolumeGroup creation will fail.
+                  This is done at runtime and after admission of the VolumeGroupSpec.
+                items:
+                  description: |-
+                    PVSelectorTerm is a term that must be fullfilled by a physical volume candidate to be considered for the volume group.
+                    A null or empty pv selector term matches no objects.
+                    The requirements of them are ANDed.
+                  properties:
+                    matchLSBLK:
+                      description: A list of node selector requirements by node's
+                        labels.
+                      items:
+                        description: |-
+                          LSBLKSelectorRequirement is a selector that contains values, a key, and an operator
+                          that relates the key and values.
+                        properties:
+                          key:
+                            description: The label key that the selector applies to.
+                            enum:
+                            - NAME
+                            - KNAME
+                            - PATH
+                            - MAJ:MIN
+                            - FSAVAIL
+                            - FSSIZE
+                            - FSTYPE
+                            - FSUSED
+                            - FSUSE%
+                            - FSROOTS
+                            - FSVER
+                            - MOUNTPOINT
+                            - MOUNTPOINTS
+                            - LABEL
+                            - UUID
+                            - PTUUID
+                            - PTTYPE
+                            - PARTTYPE
+                            - PARTTYPENAME
+                            - PARTLABEL
+                            - PARTUUID
+                            - PARTFLAGS
+                            - RA
+                            - RO
+                            - RM
+                            - HOTPLUG
+                            - MODEL
+                            - SERIAL
+                            - SIZE
+                            - STATE
+                            - OWNER
+                            - GROUP
+                            - MODE
+                            - ALIGNMENT
+                            - MIN-IO
+                            - OPT-IO
+                            - PHY-SEC
+                            - LOG-SEC
+                            - ROTA
+                            - SCHED
+                            - RQ-SIZE
+                            - TYPE
+                            - DISC-ALN
+                            - DISC-GRAN
+                            - DISC-MAX
+                            - DISC-ZERO
+                            - WSAME
+                            - WWN
+                            - RAND
+                            - PKNAME
+                            - HCTL
+                            - TRAN
+                            - SUBSYSTEMS
+                            - REV
+                            - VENDOR
+                            - ZONED
+                            - DAX
+                            type: string
+                          operator:
                             description: |-
-                              LSBLKSelectorRequirement is a selector that contains values, a key, and an operator
-                              that relates the key and values.
-                            properties:
-                              key:
-                                description: The label key that the selector applies
-                                  to.
-                                enum:
-                                - NAME
-                                - KNAME
-                                - PATH
-                                - MAJ:MIN
-                                - FSAVAIL
-                                - FSSIZE
-                                - FSTYPE
-                                - FSUSED
-                                - FSUSE%
-                                - FSROOTS
-                                - FSVER
-                                - MOUNTPOINT
-                                - MOUNTPOINTS
-                                - LABEL
-                                - UUID
-                                - PTUUID
-                                - PTTYPE
-                                - PARTTYPE
-                                - PARTTYPENAME
-                                - PARTLABEL
-                                - PARTUUID
-                                - PARTFLAGS
-                                - RA
-                                - RO
-                                - RM
-                                - HOTPLUG
-                                - MODEL
-                                - SERIAL
-                                - SIZE
-                                - STATE
-                                - OWNER
-                                - GROUP
-                                - MODE
-                                - ALIGNMENT
-                                - MIN-IO
-                                - OPT-IO
-                                - PHY-SEC
-                                - LOG-SEC
-                                - ROTA
-                                - SCHED
-                                - RQ-SIZE
-                                - TYPE
-                                - DISC-ALN
-                                - DISC-GRAN
-                                - DISC-MAX
-                                - DISC-ZERO
-                                - WSAME
-                                - WWN
-                                - RAND
-                                - PKNAME
-                                - HCTL
-                                - TRAN
-                                - SUBSYSTEMS
-                                - REV
-                                - VENDOR
-                                - ZONED
-                                - DAX
-                                type: string
-                              operator:
-                                description: |-
-                                  Represents a key's relationship to a set of values.
-                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-                                type: string
-                              values:
-                                description: |-
-                                  An array of string values. If the operator is In or NotIn,
-                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                                  the values array must be empty. If the operator is Gt or Lt, the values
-                                  array must have a single element, which will be interpreted as a resource.Quantity.
-                                  This array is replaced during a strategic merge patch.
-                                items:
-                                  type: string
-                                type: array
-                                x-kubernetes-list-type: atomic
-                            required:
-                            - key
-                            - operator
-                            type: object
-                          type: array
-                          x-kubernetes-list-type: atomic
-                      type: object
-                      x-kubernetes-map-type: atomic
-                    type: array
-                    x-kubernetes-list-type: atomic
-                required:
-                - pvSelectorTerms
-                type: object
-                x-kubernetes-map-type: atomic
-              pvs:
-                items:
-                  type: string
+                              Represents a key's relationship to a set of values.
+                              Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                            type: string
+                          values:
+                            description: |-
+                              An array of string values.
+                              If the operator is PVSelectorOpIn, Values must be non-empty.
+                              If the operator is PVSelectorOpExists or PVSelectorOpDoesNotExist, Values must be empty.
+                              If the operator is PVSelectorGt, Values must have a single element, which will be interpreted as a resource.Quantity.
+                              This array is replaced during a strategic merge patch.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                  type: object
+                  x-kubernetes-map-type: atomic
                 type: array
+                x-kubernetes-list-type: atomic
               tags:
+                description: |-
+                  Tags is a list of tags to apply to the volume group.
+                  Tags are used to group volume groups and to apply policies to them.
+                  They can also be used on the host to apply policies to all volume groups with the same tag.
+                  Tags are changeable after the volume group is created, and correspond to --addtag and --deltag operations.
+                  Tags can only be controlled by a single field manager.
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: atomic
               zero:
+                description: |-
+                  Zero controls if the first 4 sectors (2048 bytes) of the device are wiped.
+                  If not specified, the host default is used.
                 type: boolean
                 x-kubernetes-validations:
                 - message: zeroing cannot be changed once set
                   rule: self == oldSelf
             required:
             - nodeName
+            - physicalVolumeSelector
             type: object
           status:
             description: VolumeGroupStatus defines the observed state of VolumeGroup
+              in lvm2.
             properties:
               attributes:
+                description: |-
+                  VGAttributes are various attributes of the volume group.
+                  Corresponds to vg_attr.
                 type: string
               conditions:
+                description: Conditions represent the latest available observations
+                  of an object's state.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource.\n---\nThis struct is intended for
@@ -301,69 +384,118 @@ spec:
                   type: object
                 type: array
               extentCount:
+                description: |-
+                  ExtentCount is the total number of physical extents in the volume group.
+                  Corresponds to vg_extent_count.
                 format: int64
                 type: integer
               extentSize:
                 anyOf:
                 - type: integer
                 - type: string
+                description: |-
+                  ExtentSize is the size of physical extents in the volume group.
+                  Corresponds to vg_extent_size.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
               free:
                 anyOf:
                 - type: integer
                 - type: string
+                description: |-
+                  Free is the total amount of free space in the volume group.
+                  Corresponds to vg_free.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
               lvCount:
+                description: |-
+                  LvCount is the number of logical volumes in the volume group.
+                  Corresponds to lv_count.
                 format: int64
                 type: integer
               maxLv:
+                description: |-
+                  MaxLv is the maximum number of logical volumes allowed in the volume group.
+                  Corresponds to max_lv.
                 format: int64
                 type: integer
               maxPv:
-                format: int64
-                type: integer
-              mdaCopies:
+                description: |-
+                  MaxPv is the maximum number of physical volumes allowed in the volume group.
+                  Corresponds to max_pv.
                 format: int64
                 type: integer
               mdaCount:
+                description: |-
+                  MDACount is the number of metadata areas on the volume group.
+                  Corresponds to vg_mda_count.
                 format: int64
                 type: integer
               mdaUsedCount:
+                description: |-
+                  MDAUsedCount is the number of metadata areas in use on the volume group.
+                  Corresponds to vg_mda_used_count.
                 format: int64
                 type: integer
               missingPvCount:
+                description: |-
+                  MissingPVCount is the number of physical volumes in the volume group which are missing.
+                  Corresponds to vg_missing_pv_count.
                 format: int64
                 type: integer
               name:
+                description: |-
+                  Name is the current name of the volume group on the node as visible in lvm2.
+                  Corresponds to vg_name.
                 type: string
               pvCount:
+                description: |-
+                  PvCount is the number of physical volumes in the volume group.
+                  Corresponds to pv_count.
                 format: int64
                 type: integer
               pvs:
+                description: PVs is a list of physical volumes in the volume group.
                 items:
                   type: string
                 type: array
               seqno:
+                description: |-
+                  SeqNo is the revision number of internal metadata.
+                  Corresponds to vg_seqno.
                 format: int64
                 type: integer
               size:
                 anyOf:
                 - type: integer
                 - type: string
+                description: |-
+                  Size is the total size of the volume group.
+                  Corresponds to vg_size.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
               snapCount:
+                description: |-
+                  SnapCount is the number of snapshots in the volume group.
+                  Corresponds to snap_count.
                 format: int64
                 type: integer
               sysid:
+                description: |-
+                  SysID is the system ID of the VG indicating which host owns it.
+                  Corresponds to vg_sysid or vg_systemid.
                 type: string
               tags:
+                description: |-
+                  Tags are tags applied to the volume group.
+                  Corresponds to vg_tags.
                 items:
                   type: string
                 type: array
               uuid:
+                description: |-
+                  UUID is the UUID of the volume group.
+                  Corresponds to vg_uuid.
                 type: string
             required:
             - name

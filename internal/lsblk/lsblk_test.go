@@ -8,6 +8,7 @@ import (
 )
 
 func TestLSBLK(t *testing.T) {
+
 	device, err := lvm2go.NewLoopbackDevice(lvm2go.MustParseSize("10M"))
 	if err != nil {
 		t.Fatal(err)
@@ -18,14 +19,14 @@ func TestLSBLK(t *testing.T) {
 		}
 	}()
 
-	lsblk, err := LSBLK(context.Background(), ColumnName, ColumnKName)
+	lsblk, err := LSBLK(context.Background(), ColumnPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	found := false
 	for i := range RecursiveBlockDevices(lsblk) {
-		if name, _ := lsblk[i].GetString(ColumnName); name == device.Device() {
+		if path, _ := lsblk[i].GetString(ColumnPath); path == device.Device() {
 			found = true
 			break
 		}

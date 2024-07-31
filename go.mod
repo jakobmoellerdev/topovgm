@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/jakobmoellerdev/lvm2go v0.0.0-20240730165026-cdd135915bea
+	github.com/jakobmoellerdev/lvm2go v0.0.0-20240731122836-098215ab250c
 	github.com/onsi/ginkgo/v2 v2.19.1
 	github.com/onsi/gomega v1.34.1
 	k8s.io/apimachinery v0.30.3

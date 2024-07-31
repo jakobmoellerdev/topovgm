@@ -75,7 +75,7 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	name := nameOnNode(vg)
+	name := getNameOnNode(vg)
 	logger = logger.WithValues("node", r.NodeName, "lvm_name", name)
 
 	if !vg.GetDeletionTimestamp().IsZero() {

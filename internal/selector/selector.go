@@ -13,14 +13,14 @@ import (
 
 var runLSBLK = lsblk.LSBLK
 
-func DevicesMatchingSelector(ctx context.Context, selector v1alpha1.PVSelector) ([]string, error) {
-	if len(selector.PVSelectorTerms) == 0 {
+func DevicesMatchingSelector(ctx context.Context, selector v1alpha1.PhysicalVolumeSelector) ([]string, error) {
+	if len(selector) == 0 {
 		return nil, nil
 	}
 
-	columns := make([]lsblk.Column, 0, len(selector.PVSelectorTerms))
+	columns := make([]lsblk.Column, 0, len(selector))
 	columns = append(columns, lsblk.ColumnPath)
-	for _, term := range selector.PVSelectorTerms {
+	for _, term := range selector {
 		for _, requirement := range term.MatchLSBLK {
 			columns = append(columns, lsblk.Column(requirement.Key))
 		}
@@ -38,7 +38,7 @@ func DevicesMatchingSelector(ctx context.Context, selector v1alpha1.PVSelector) 
 
 	var selected []string
 
-	for _, term := range selector.PVSelectorTerms {
+	for _, term := range selector {
 		for _, dev := range devices {
 			var matches int
 			for _, requirement := range term.MatchLSBLK {

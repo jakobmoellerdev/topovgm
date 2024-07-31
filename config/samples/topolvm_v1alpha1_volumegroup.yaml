@@ -7,10 +7,12 @@ metadata:
   name: vg1
 spec:
   nodeName: crc
+  allocationPolicy: normal
   tags:
     - topovgm
-  pvSelector:
-    pvSelectorTerms:
+  physicalExtentSize: 4Mi
+  zero: true
+  physicalVolumeSelector:
     - matchLSBLK:
         - key: TYPE
           operator: In
