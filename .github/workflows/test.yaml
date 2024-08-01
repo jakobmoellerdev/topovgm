@@ -67,7 +67,7 @@ jobs:
       - name: Run tests
         run: sudo make test
 
-  e2e:
+  e2e-minikube:
     needs: image
     runs-on: ubuntu-latest
     steps:
@@ -130,3 +130,27 @@ jobs:
       - run: make test-e2e
         env:
           IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
+
+
+  e2e-k3s:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install k3s
+        run: |
+          curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --flannel-backend=none" sh -
+          sudo k3s kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+      - name: Wait for K3s to be ready
+        run: |
+          for i in {1..60}; do
+            sudo k3s kubectl get nodes && break
+            sleep 5
+          done
+
+      - name: Verify Calico Installation
+        run: |
+          sudo k3s kubectl get pods -n kube-system -l k8s-app=calico-node
