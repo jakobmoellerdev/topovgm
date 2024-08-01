@@ -30,6 +30,8 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+          flavor: |
+            latest=true
       - name: Build and export
         uses: docker/build-push-action@v6
         with:
@@ -131,4 +133,4 @@ jobs:
       - run: make -C test/e2e launch
       - run: make test-e2e
         env:
-          IMAGE_NAME: ${{needs.image.outputs.TAGS[0]}}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}:latest
