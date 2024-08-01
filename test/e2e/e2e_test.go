@@ -109,6 +109,13 @@ var _ = Describe("controller", Ordered, func() {
 			}
 			EventuallyWithOffset(1, verifyControllerUp, time.Minute, time.Second).Should(Succeed())
 
+			By("creating a VolumeGroup")
+			cmd = exec.Command("kubectl", "apply", "-f", "config/samples/topolvm_v1alpha1_volumegroup.yaml", "-n", namespace)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+			By("validating that the VolumeGroup is created successfully")
+			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True volumegroup/vg1", "--timeout=120s", "-n", namespace)
 		})
 	})
 })

@@ -155,7 +155,7 @@ jobs:
         with:
           name: ${{ env.IMAGE_ARTIFACT }}
           path: /tmp
-      - name: Load image into Docker
+      - name: Load image
         run: |
           k3d image import /tmp/${{ env.IMAGE_ARTIFACT }}.tar
 
