@@ -132,22 +132,22 @@ jobs:
           IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
 
 
-  e2e-k3s:
+  e2e-k3d:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Install k3s
+      - name: Install k3d
         run: |
-          curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --flannel-backend=none" sh -
-          sudo k3s kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-      - name: Wait for K3s to be ready
+      - name: Create k3d cluster with Flannel
         run: |
-          sudo k3s kubectl wait --for=condition=available --timeout=120s daemonset/calico-node deployment/calico-kube-controllers -n kube-system
-
-      - name: Verify Calico Installation
+          k3d cluster create mycluster --k3s-server-arg '--disable=traefik' --volume /dev:/dev
+      - name: Wait for cluster to be ready
         run: |
-          sudo k3s kubectl get pods -n kube-system -l k8s-app=calico-node
+          kubectl wait --for=condition=ready nodes --all --timeout=180s
+      - name: Access loop device from nodes
+        run: |
+          for node in $(k3d node list -o json | jq -r '.[].name'); do
+            docker exec $node ls /dev/loop*
+          done
