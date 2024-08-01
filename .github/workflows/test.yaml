@@ -123,6 +123,12 @@ jobs:
           sudo tar zxvf crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz -C /usr/local/bin
       - run: make -C test/e2e setup
       - run: make -C test/e2e launch
+      - name: set node name on sample
+        run: |
+          apt-get install -y --no-install-recommends yq
+          yq -i -e ".spec.nodeName = \"$(kubectl get node -oyaml | yq -r .items[0].metadata.name)\"" config/samples/topolvm_v1alpha1_volumegroup.yaml
+        env:
+          DEBIAN_FRONTEND: noninteractive
       - name: Load image into Docker
         run: |
           docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
@@ -136,6 +142,9 @@ jobs:
     needs: image
     runs-on: ubuntu-latest
     steps:
+      - run: sudo apt-get install -y --no-install-recommends lvm2 xfsprogs thin-provisioning-tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
       - uses: actions/checkout@v4
       - name: Install k3d
         run: |
