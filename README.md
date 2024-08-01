@@ -126,8 +126,22 @@ status:
 ### Prerequisites
 - go version v1.22.0+
 - docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- kubectl version v1.30+.
+- Access to a Kubernetes v1.30+ cluster.
+- lsblk from util-linux 2.39.4+
+- lvm2 version 2.03.11+ (ideally 2.03.23) on the node
+
+To install the node dependencies, you can run the following command:
+
+#### For Debian-based systems
+```sh
+sudo apt-get install -y lvm2 util-linux
+```
+
+#### For CentOS / Fedora / RHEL
+```sh
+sudo dnf install -y lvm2 util-linux
+```
 
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**

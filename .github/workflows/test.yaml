@@ -28,3 +28,53 @@ jobs:
         run: go version
       - name: Run tests
         run: sudo make test
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: "go.mod"
+      - name: cache go dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ hashFiles('go.sum', 'Makefile') }}
+          restore-keys: |
+            go-
+      - name: install dependencies of minikube
+        env:
+          CNI_PLUGINS_VERSION: v1.5.1
+          CRI_DOCKERD_VERSION: v0.3.14
+          CRICTL_VERSION: v1.30.1
+        run: |
+          curl -L -o cni-plugins.tgz https://github.com/containernetworking/plugins/releases/download/${{ env.CNI_PLUGINS_VERSION }}/cni-plugins-linux-amd64-${{ env.CNI_PLUGINS_VERSION }}.tgz
+          sudo mkdir -p /opt/cni/bin
+          sudo tar -C /opt/cni/bin -xzf cni-plugins.tgz
+
+          # Install cri-docker
+          git clone -n https://github.com/Mirantis/cri-dockerd
+          cd cri-dockerd
+          git checkout ${{ env.CRI_DOCKERD_VERSION }}
+          mkdir bin
+          go get && go build -o bin/cri-dockerd
+          mkdir -p /usr/local/bin
+          sudo install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+          sudo cp -a packaging/systemd/* /etc/systemd/system
+          sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+
+          # This is a workaround for the following issue.
+          # https://github.com/kubernetes/minikube/issues/15265
+          sudo ln -s /usr/local/bin/cri-dockerd /usr/bin/cri-dockerd
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable cri-docker.service
+          sudo systemctl enable --now cri-docker.socket
+          curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${{ env.CRICTL_VERSION }}/crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz --output crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz
+          sudo tar zxvf crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz -C /usr/local/bin
+
+      - run: make -C test/e2e setup
+      - run: make -C test/e2e launch
+      - run: make test-e2e
