@@ -170,6 +170,8 @@ jobs:
             --k3s-arg "--disable=traefik@server:*" \
             --k3s-arg "--disable=servicelb@server:*" \
             --k3s-arg "--node-name=test-node"@server:0 \
+            --no-lb \
+            --no-rollback \
             --volume /dev:/dev
       - name: Access loop device from nodes
         run: |
