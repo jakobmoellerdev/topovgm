@@ -44,12 +44,30 @@ var _ = Describe("controller", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		By("printing the VolumeGroup")
-		cmd := exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
-		if data, err := utils.Run(cmd); err != nil {
-			_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
-		} else {
-			_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+		if CurrentSpecReport().Failed() {
+			By("getting the Nodes")
+			cmd := exec.Command("kubectl", "get", "nodes", "-o", "wide")
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("getting the VolumeGroup (if it exists)")
+			cmd = exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("getting the logs of the operator pod")
+			cmd = exec.Command("kubectl", "logs", "-l", "control-plane=controller-manager", "-n", namespace)
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
 		}
 
 		By("uninstalling the Prometheus manager bundle")
@@ -59,7 +77,7 @@ var _ = Describe("controller", Ordered, func() {
 		utils.UninstallCertManager()
 
 		By("removing manager namespace")
-		cmd = exec.Command("kubectl", "delete", "ns", namespace)
+		cmd := exec.Command("kubectl", "delete", "ns", namespace)
 		_, _ = utils.Run(cmd)
 	})
 
