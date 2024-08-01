@@ -125,6 +125,8 @@ jobs:
       - run: make -C test/e2e launch
       - name: set node name on sample
         run: |
+          DEBIAN_FRONTEND=noninteractive sudo add-apt-repository -y ppa:rmescandon/yq
+          DEBIAN_FRONTEND=noninteractive sudo apt-get update
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends yq
           yq -i -e ".spec.nodeName = \"$(kubectl get node -oyaml | yq -r .items[0].metadata.name)\"" config/samples/topolvm_v1alpha1_volumegroup.yaml
       - name: Load image into Docker
