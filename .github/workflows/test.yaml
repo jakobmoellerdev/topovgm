@@ -133,9 +133,10 @@ jobs:
 
 
   e2e-k3d:
+    needs: image
     runs-on: ubuntu-latest
-
     steps:
+      - uses: actions/checkout@v4
       - name: Install k3d
         run: |
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
@@ -143,11 +144,22 @@ jobs:
       - name: Create k3d cluster with Flannel
         run: |
           k3d cluster create mycluster --k3s-arg "--disable=traefik@server:*" --k3s-arg "--disable=servicelb@server:*" --volume /dev:/dev
-      - name: Wait for cluster to be ready
-        run: |
-          kubectl wait --for=condition=ready nodes --all --timeout=180s
       - name: Access loop device from nodes
         run: |
           for node in $(k3d node list -o json | jq -r '.[].name'); do
             docker exec $node ls /dev/loop*
           done
+
+      - name: Get Image from Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_ARTIFACT }}
+          path: /tmp
+      - name: Load image into Docker
+        run: |
+          docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+          docker image ls -a
+
+      - run: make test-e2e
+        env:
+          IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
