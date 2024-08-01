@@ -17,7 +17,8 @@ namePrefix: topovgm-
 resources:
 - ../crd
 - ../rbac
-- ../openshift
+# [OPENSHIFT] To enable OpenShift specific security contexts, uncomment all the sections with 'OPENSHIFT'.
+#- ../openshift
 - ../manager
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml

@@ -25,6 +25,6 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 
 # Use a multi-stage build to keep the final image minimal
 # Use alpine for nsenter, but it can be any image with nsenter installed
-FROM --platform=$TARGETPLATFORM alpine:latest
+FROM alpine:latest
 
 COPY --from=builder /workspace/manager .
