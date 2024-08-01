@@ -63,13 +63,8 @@ var _ = Describe("controller", Ordered, func() {
 			// projectimage stores the name of the image used in the example
 			var projectimage = os.Getenv("IMAGE_NAME")
 
-			By("building the manager(Operator) image with IMAGE_NAME=" + projectimage)
-			cmd := exec.Command("sudo", "make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
-			_, err = utils.Run(cmd)
-			ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
 			By("installing CRDs")
-			cmd = exec.Command("make", "install")
+			cmd := exec.Command("make", "install")
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
