@@ -141,11 +141,28 @@ var _ = Describe("controller", Ordered, func() {
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 			By("validating that the VolumeGroup is created successfully")
-			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True", "volumegroup/vg1", "--timeout=10s", "-n", namespace)
+			cmd = exec.Command(
+				"kubectl",
+				"wait",
+				"--for=condition=VolumeGroupSyncedOnNode=True",
+				"volumegroup/vg1",
+				"--timeout=10s",
+				"-n",
+				namespace,
+			)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-			cmd = exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+			cmd = exec.Command(
+				"kubectl",
+				"get",
+				"volumegroup",
+				"vg1",
+				"-o",
+				"yaml",
+				"-n",
+				namespace,
+			)
 			if data, err := utils.Run(cmd); err != nil {
 				_, _ = fmt.Fprint(GinkgoWriter, err.Error())
 			} else {
@@ -153,7 +170,16 @@ var _ = Describe("controller", Ordered, func() {
 			}
 
 			By("deleting the VolumeGroup")
-			cmd = exec.Command("kubectl", "delete", "--wait", "--timeout=30s", "volumegroup", "vg1", "-n", namespace)
+			cmd = exec.Command(
+				"kubectl",
+				"delete",
+				"--wait",
+				"--timeout=30s",
+				"volumegroup",
+				"vg1",
+				"-n",
+				namespace,
+			)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
