@@ -146,10 +146,7 @@ jobs:
 
       - name: Wait for K3s to be ready
         run: |
-          for i in {1..60}; do
-            sudo k3s kubectl get nodes && break
-            sleep 5
-          done
+          sudo k3s kubectl wait --for=condition=available --timeout=120s daemonset/calico-node deployment/calico-kube-controllers -n kube-system
 
       - name: Verify Calico Installation
         run: |
