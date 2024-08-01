@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -60,9 +61,9 @@ var _ = Describe("controller", Ordered, func() {
 			var err error
 
 			// projectimage stores the name of the image used in the example
-			var projectimage = "example.com/topovgm:v0.0.1"
+			var projectimage = os.Getenv("IMAGE_NAME")
 
-			By("building the manager(Operator) image")
+			By("building the manager(Operator) image with IMAGE_NAME=" + projectimage)
 			cmd := exec.Command("sudo", "make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())

@@ -20,6 +20,7 @@ setup:
 .PHONY: launch
 launch:
 	$(SUDO) -E $(BINDIR)/minikube start \
+			--addons=[] \
     		--vm-driver=none \
     		--kubernetes-version=v$(KUBERNETES_VERSION) \
     		--extra-config=kubelet.read-only-port=10255 \

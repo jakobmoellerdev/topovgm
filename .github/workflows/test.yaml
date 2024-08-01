@@ -9,8 +9,26 @@ on:
       - "**/*.md"
     branches:
       - "main"
-
+env:
+  IMAGE_NAME: topovgm:ci
+  IMAGE_ARTIFACT: topovgm-ci-container-image
 jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and export
+        uses: docker/build-push-action@v6
+        with:
+          tags: ${{ env.IMAGE_NAME }}
+          outputs: type=docker,dest=/tmp/${{ env.IMAGE_ARTIFACT }}.tar
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_ARTIFACT }}
+          path: /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+
   unit-tests:
     env:
       GOTOOLCHAIN: local
@@ -28,7 +46,9 @@ jobs:
         run: go version
       - name: Run tests
         run: sudo make test
+
   e2e:
+    needs: image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +64,18 @@ jobs:
           key: go-${{ hashFiles('go.sum', 'Makefile') }}
           restore-keys: |
             go-
+
+      - name: Get Image from Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_ARTIFACT }}
+          path: /tmp
+
+      - name: Load image into Docker
+        run: |
+          docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+          docker image ls -a
+
       - name: install dependencies of minikube
         env:
           CNI_PLUGINS_VERSION: v1.5.1
