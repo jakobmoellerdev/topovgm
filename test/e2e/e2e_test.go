@@ -144,6 +144,18 @@ var _ = Describe("controller", Ordered, func() {
 			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True", "volumegroup/vg1", "--timeout=10s", "-n", namespace)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+			cmd = exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("deleting the VolumeGroup")
+			cmd = exec.Command("kubectl", "delete", "--cascade=foreground", "--wait", "--timeout=10s", "volumegroup", "vg1", "-n", namespace)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
 	})
 })
