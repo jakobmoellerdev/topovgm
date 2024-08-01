@@ -3,7 +3,7 @@ kind: VolumeGroup
 metadata:
   name: vg1
 spec:
-  nodeName: test-node
+  nodeName: crc
   allocationPolicy: normal
   tags:
     - topovgm
