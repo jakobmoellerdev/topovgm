@@ -143,7 +143,11 @@ jobs:
 
       - name: Create k3d cluster with Flannel
         run: |
-          k3d cluster create --k3s-arg "--disable=traefik@server:*" --k3s-arg "--disable=servicelb@server:*" --volume /dev:/dev
+          k3d cluster create \
+            --k3s-arg "--disable=traefik@server:*" \
+            --k3s-arg "--disable=servicelb@server:*" \
+            --k3s-arg "--node-name=test-node"@server:0 \
+            --volume /dev:/dev
       - name: Access loop device from nodes
         run: |
           for node in $(k3d node list -o json | jq -r '.[].name'); do
