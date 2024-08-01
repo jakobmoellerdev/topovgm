@@ -44,6 +44,32 @@ var _ = Describe("controller", Ordered, func() {
 	})
 
 	AfterAll(func() {
+		if CurrentSpecReport().Failed() {
+			By("getting the Nodes")
+			cmd := exec.Command("kubectl", "get", "nodes", "-o", "wide")
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprint(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("getting the VolumeGroup (if it exists)")
+			cmd = exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprint(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("getting the logs of the operator pod")
+			cmd = exec.Command("kubectl", "logs", "-l", "control-plane=controller-manager", "-n", namespace)
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprint(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+		}
+
 		By("uninstalling the Prometheus manager bundle")
 		utils.UninstallPrometheusOperator()
 
@@ -51,7 +77,7 @@ var _ = Describe("controller", Ordered, func() {
 		utils.UninstallCertManager()
 
 		By("removing manager namespace")
-		cmd := exec.Command("kubectl", "delete", "ns", namespace)
+		cmd := exec.Command("kubectl", "delete", "--wait", "--timeout=30s", "ns", namespace)
 		_, _ = utils.Run(cmd)
 	})
 
@@ -109,6 +135,53 @@ var _ = Describe("controller", Ordered, func() {
 			}
 			EventuallyWithOffset(1, verifyControllerUp, time.Minute, time.Second).Should(Succeed())
 
+			By("creating a VolumeGroup")
+			cmd = exec.Command("kubectl", "apply", "-f", "config/samples/topolvm_v1alpha1_volumegroup.yaml", "-n", namespace)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+			By("validating that the VolumeGroup is created successfully")
+			cmd = exec.Command(
+				"kubectl",
+				"wait",
+				"--for=condition=VolumeGroupSyncedOnNode=True",
+				"volumegroup/vg1",
+				"--timeout=10s",
+				"-n",
+				namespace,
+			)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+			cmd = exec.Command(
+				"kubectl",
+				"get",
+				"volumegroup",
+				"vg1",
+				"-o",
+				"yaml",
+				"-n",
+				namespace,
+			)
+			if data, err := utils.Run(cmd); err != nil {
+				_, _ = fmt.Fprint(GinkgoWriter, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+			}
+
+			By("deleting the VolumeGroup")
+			cmd = exec.Command(
+				"kubectl",
+				"delete",
+				"--wait",
+				"--timeout=30s",
+				"volumegroup",
+				"vg1",
+				"-n",
+				namespace,
+			)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
 	})
 })

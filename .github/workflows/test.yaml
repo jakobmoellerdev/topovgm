@@ -67,7 +67,7 @@ jobs:
       - name: Run tests
         run: sudo make test
 
-  e2e:
+  e2e-minikube:
     needs: image
     runs-on: ubuntu-latest
     steps:
@@ -123,10 +123,78 @@ jobs:
           sudo tar zxvf crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz -C /usr/local/bin
       - run: make -C test/e2e setup
       - run: make -C test/e2e launch
+
+      - name: determine node
+        id: nodename
+        run: |
+          echo "node=$(kubectl get node -oyaml | yq -r .items[0].metadata.name)" >> $GITHUB_OUTPUT
+      - name: set node name on sample
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i -e '.spec.nodeName = "${{ steps.nodename.outputs.node }}"' config/samples/topolvm_v1alpha1_volumegroup.yaml
       - name: Load image into Docker
         run: |
           docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
           docker image ls -a
+      - name: Setup Loop Device
+        run: |
+          export DEVICE=5
+          dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144
+          sudo losetup /dev/loop$DEVICE /tmp/lblock$DEVICE
+          echo "Using loop device /dev/loop$DEVICE"
+      - run: make test-e2e
+        env:
+          IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
+
+
+  e2e-k3d:
+    env:
+      K3D_NODE_IMAGE: localhost/k3d-node-image
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - name: Install k3d
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      - name: Create k3d cluster with Flannel
+        run: |
+          k3d cluster create \
+            --image ghcr.io/jakobmoellerdev/k3s:alpine-latest \
+            --k3s-arg "--disable=traefik@server:*" \
+            --k3s-arg "--disable=servicelb@server:*" \
+            --k3s-arg "--node-name=test-node"@server:0 \
+            --no-lb \
+            --no-rollback \
+            --volume /dev:/dev
+      - name: Access loop device from nodes
+        run: |
+          docker exec $(k3d node list -o yaml | yq -r '.[0].name') ls /dev/loop*
+          docker exec $(k3d node list -o yaml | yq -r '.[0].name') sh -c 'export DEVICE=5 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup /dev/loop$DEVICE /tmp/lblock$DEVICE && echo "Using loop device /dev/loop$DEVICE"'
+      - name: Get Image from Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_ARTIFACT }}
+          path: /tmp
+      - name: Load image
+        run: |
+          k3d image import /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+
+      - name: determine node
+        id: nodename
+        run: |
+          echo "node=$(kubectl get node -oyaml | yq -r .items[0].metadata.name)" >> $GITHUB_OUTPUT
+      - name: set node name on sample
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i -e '.spec.nodeName = "${{ steps.nodename.outputs.node }}"' config/samples/topolvm_v1alpha1_volumegroup.yaml
+
       - run: make test-e2e
         env:
           IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
