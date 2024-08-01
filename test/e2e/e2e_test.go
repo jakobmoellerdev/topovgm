@@ -114,8 +114,17 @@ var _ = Describe("controller", Ordered, func() {
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
+			DeferCleanup(func() {
+				By("printing the VolumeGroup")
+				cmd := exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+				_, err = utils.Run(cmd)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred())
+			})
+
 			By("validating that the VolumeGroup is created successfully")
-			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True volumegroup/vg1", "--timeout=120s", "-n", namespace)
+			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True", "volumegroup/vg1", "--timeout=120s", "-n", namespace)
+			_, err = utils.Run(cmd)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
 	})
 })
