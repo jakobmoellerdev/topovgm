@@ -117,9 +117,11 @@ var _ = Describe("controller", Ordered, func() {
 			DeferCleanup(func() {
 				By("printing the VolumeGroup")
 				cmd := exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
-				data, err := utils.Run(cmd)
-				ExpectWithOffset(1, err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("VolumeGroup:\n%s\n", string(data))
+				if data, err := utils.Run(cmd); err != nil {
+					_, _ = fmt.Fprintf(GinkgoWriter, "failed to get VolumeGroup: %v", err)
+				} else {
+					_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+				}
 			})
 
 			By("validating that the VolumeGroup is created successfully")
