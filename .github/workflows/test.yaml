@@ -131,7 +131,7 @@ jobs:
       - name: set node name on sample
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i -e ".spec.nodeName = \"${{ steps.nodename.outputs.node }}\"" config/samples/topolvm_v1alpha1_volumegroup.yaml
+          cmd: yq -i -e '.spec.nodeName = "${{ steps.nodename.outputs.node }}"' config/samples/topolvm_v1alpha1_volumegroup.yaml
       - name: Load image into Docker
         run: |
           docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
