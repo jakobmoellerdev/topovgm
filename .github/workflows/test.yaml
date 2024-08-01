@@ -142,7 +142,7 @@ jobs:
 
       - name: Create k3d cluster with Flannel
         run: |
-          k3d cluster create mycluster --k3s-server-arg '--disable=traefik' --volume /dev:/dev
+          k3d cluster create mycluster --k3s-arg "--disable=traefik@server:*" --k3s-arg "--disable=servicelb@server:*" --volume /dev:/dev
       - name: Wait for cluster to be ready
         run: |
           kubectl wait --for=condition=ready nodes --all --timeout=180s
