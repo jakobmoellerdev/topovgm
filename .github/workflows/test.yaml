@@ -127,10 +127,9 @@ jobs:
       - run: make -C test/e2e launch
       - name: Load image into Docker
         run: |
+          eval $(minikube docker-env)
           docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
           docker image ls -a
-          minikube image ls
-          minikube image load ${{ env.IMAGE_NAME }}
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}:latest
       - run: make test-e2e
