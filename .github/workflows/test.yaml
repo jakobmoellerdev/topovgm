@@ -138,7 +138,10 @@ jobs:
           docker image ls -a
       - name: Setup Loop Device
         run: |
-          export DEVICE=5 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup /dev/loop$DEVICE /tmp/lblock$DEVICE && echo "Using loop device /dev/loop$DEVICE"
+          export DEVICE=5
+          dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144
+          sudo losetup /dev/loop$DEVICE /tmp/lblock$DEVICE
+          echo "Using loop device /dev/loop$DEVICE"
       - run: make test-e2e
         env:
           IMAGE_NAME: ${{ fromJSON(needs.image.outputs.meta).tags[0] }}
