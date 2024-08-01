@@ -170,7 +170,7 @@ jobs:
           for node in $(k3d node list -o json | jq -r '.[].name'); do
             docker exec $node ls /dev/loop*
             echo "Setting up loop devices on $node"
-            docker exec $node sh -c 'export DEVICE=0 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup -f /tmp/lblock$DEVICE && echo "Using loop device $(losetup -j /tmp/lblock$DEVICE)"'
+            docker exec $node sh -c 'export DEVICE=5 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup /dev/loop$DEVICE /tmp/lblock$DEVICE && echo "Using loop device /dev/loop$DEVICE"'
           done
       - name: Get Image from Artifact
         uses: actions/download-artifact@v4

@@ -11,7 +11,7 @@ spec:
   zero: true
   physicalVolumeSelector:
     - matchLSBLK:
-        - key: TYPE
+        - key: PATH
           operator: In
           values:
-            - loop
+            - /dev/loop5
