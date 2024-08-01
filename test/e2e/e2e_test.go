@@ -44,6 +44,14 @@ var _ = Describe("controller", Ordered, func() {
 	})
 
 	AfterAll(func() {
+		By("printing the VolumeGroup")
+		cmd := exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
+		if data, err := utils.Run(cmd); err != nil {
+			_, _ = fmt.Fprintf(GinkgoWriter, err.Error())
+		} else {
+			_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
+		}
+
 		By("uninstalling the Prometheus manager bundle")
 		utils.UninstallPrometheusOperator()
 
@@ -51,7 +59,7 @@ var _ = Describe("controller", Ordered, func() {
 		utils.UninstallCertManager()
 
 		By("removing manager namespace")
-		cmd := exec.Command("kubectl", "delete", "ns", namespace)
+		cmd = exec.Command("kubectl", "delete", "ns", namespace)
 		_, _ = utils.Run(cmd)
 	})
 
@@ -114,18 +122,8 @@ var _ = Describe("controller", Ordered, func() {
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-			DeferCleanup(func() {
-				By("printing the VolumeGroup")
-				cmd := exec.Command("kubectl", "get", "volumegroup", "vg1", "-n", namespace, "-o", "yaml")
-				if data, err := utils.Run(cmd); err != nil {
-					_, _ = fmt.Fprintf(GinkgoWriter, "failed to get VolumeGroup: %v", err)
-				} else {
-					_, _ = fmt.Fprintf(GinkgoWriter, "%s", data)
-				}
-			})
-
 			By("validating that the VolumeGroup is created successfully")
-			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True", "volumegroup/vg1", "--timeout=120s", "-n", namespace)
+			cmd = exec.Command("kubectl", "wait", "--for=condition=VolumeGroupSyncedOnNode=True", "volumegroup/vg1", "--timeout=10s", "-n", namespace)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
