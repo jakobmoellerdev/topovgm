@@ -167,11 +167,8 @@ jobs:
             --volume /dev:/dev
       - name: Access loop device from nodes
         run: |
-          for node in $(k3d node list -o json | jq -r '.[].name'); do
-            docker exec $node ls /dev/loop*
-            echo "Setting up loop devices on $node"
-            docker exec $node sh -c 'export DEVICE=5 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup /dev/loop$DEVICE /tmp/lblock$DEVICE && echo "Using loop device /dev/loop$DEVICE"'
-          done
+          docker exec $(k3d node list -o yaml | yq -r '.[0].name') ls /dev/loop*
+          docker exec $(k3d node list -o yaml | yq -r '.[0].name') sh -c 'export DEVICE=5 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup /dev/loop$DEVICE /tmp/lblock$DEVICE && echo "Using loop device /dev/loop$DEVICE"'
       - name: Get Image from Artifact
         uses: actions/download-artifact@v4
         with:
@@ -180,6 +177,15 @@ jobs:
       - name: Load image
         run: |
           k3d image import /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+
+      - name: determine node
+        id: nodename
+        run: |
+          echo "node=$(kubectl get node -oyaml | yq -r .items[0].metadata.name)" >> $GITHUB_OUTPUT
+      - name: set node name on sample
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i -e '.spec.nodeName = "${{ steps.nodename.outputs.node }}"' config/samples/topolvm_v1alpha1_volumegroup.yaml
 
       - run: make test-e2e
         env:
