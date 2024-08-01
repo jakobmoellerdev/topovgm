@@ -123,9 +123,15 @@ jobs:
           sudo tar zxvf crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz -C /usr/local/bin
       - run: make -C test/e2e setup
       - run: make -C test/e2e launch
-      - name: set node name on sample
+
+      - name: determine node
+        id: nodename
         run: |
-          docker run --rm -v "${PWD}":/workdir:rw mikefarah/yq -i -e ".spec.nodeName = \"$(kubectl get node -oyaml | yq -r .items[0].metadata.name)\"" config/samples/topolvm_v1alpha1_volumegroup.yaml
+          echo "node=$(kubectl get node -oyaml | yq -r .items[0].metadata.name)" >> $GITHUB_OUTPUT
+      - name: set node name on sample
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i -e ".spec.nodeName = \"${{ steps.nodename.outputs.node }}\"" config/samples/topolvm_v1alpha1_volumegroup.yaml
       - name: Load image into Docker
         run: |
           docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
@@ -164,7 +170,7 @@ jobs:
           for node in $(k3d node list -o json | jq -r '.[].name'); do
             docker exec $node ls /dev/loop*
             echo "Setting up loop devices on $node"
-            docker exec $node sh -c 'export DEVICE=0 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup -f /tmp/lblock$DEVICE'
+            docker exec $node sh -c 'export DEVICE=0 && dd if=/dev/zero of=/tmp/lblock$DEVICE bs=4K count=262144 && losetup -f /tmp/lblock$DEVICE && echo "Using loop device $(losetup -j /tmp/lblock$DEVICE)"'
           done
       - name: Get Image from Artifact
         uses: actions/download-artifact@v4
