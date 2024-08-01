@@ -93,11 +93,6 @@ jobs:
           name: ${{ env.IMAGE_ARTIFACT }}
           path: /tmp
 
-      - name: Load image into Docker
-        run: |
-          docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
-          docker image ls -a
-
       - name: install dependencies of minikube
         env:
           CNI_PLUGINS_VERSION: v1.5.1
@@ -128,9 +123,16 @@ jobs:
           sudo systemctl enable --now cri-docker.socket
           curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${{ env.CRICTL_VERSION }}/crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz --output crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz
           sudo tar zxvf crictl-${{ env.CRICTL_VERSION }}-linux-amd64.tar.gz -C /usr/local/bin
-
       - run: make -C test/e2e setup
       - run: make -C test/e2e launch
+      - name: Load image into Docker
+        run: |
+          docker load --input /tmp/${{ env.IMAGE_ARTIFACT }}.tar
+          docker image ls -a
+          minikube image ls
+          minikube image load ${{ env.IMAGE_NAME }}
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}:latest
       - run: make test-e2e
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}:latest
