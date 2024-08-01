@@ -80,7 +80,14 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if !vg.GetDeletionTimestamp().IsZero() {
 		logger.V(1).Info("removing volume group from host")
-		if err := r.LVM.VGRemove(ctx, name); err != nil {
+		// If the VG is being deleted, we need to remove it from the host.
+		// If the deletion grace period is set and the deletion timestamp has passed, we need to force the removal.
+		forceAt := vg.GetDeletionTimestamp().Add(time.Duration(*vg.GetDeletionGracePeriodSeconds()) * time.Second)
+		force := time.Now().After(forceAt)
+		if force {
+			logger.V(1).Info("force removal of volume group from host due to passed grace period")
+		}
+		if err := r.LVM.VGRemove(ctx, name, lvm2go.Force(force)); err != nil {
 			if lvm2go.IsLVMErrNotFound(err) {
 				logger.V(1).Info("volume group not found on host, removing finalizer")
 			} else {
@@ -90,6 +97,7 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if updated := controllerutil.RemoveFinalizer(vg, VolumeGroupFinalizer); updated {
 			return ctrl.Result{}, r.Update(ctx, vg)
 		}
+		logger.V(1).Info("volume group has been removed and is now waiting for other finalizers to be removed")
 		return ctrl.Result{Requeue: true}, nil
 	}
 

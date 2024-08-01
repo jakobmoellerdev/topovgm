@@ -153,7 +153,7 @@ var _ = Describe("controller", Ordered, func() {
 			}
 
 			By("deleting the VolumeGroup")
-			cmd = exec.Command("kubectl", "delete", "--cascade=foreground", "--wait", "--timeout=10s", "volumegroup", "vg1", "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "--wait", "--timeout=30s", "volumegroup", "vg1", "-n", namespace)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		})
