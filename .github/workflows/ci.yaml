@@ -51,9 +51,12 @@ jobs:
           path: /tmp/${{ env.IMAGE_ARTIFACT }}.tar
     outputs:
       meta: ${{ steps.meta.outputs.json }}
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
+      annotations: ${{ steps.meta.outputs.annotations }}
 
   push-to-registry:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: image
     runs-on: ubuntu-latest
     permissions:
@@ -81,9 +84,9 @@ jobs:
         id: push
         with:
           push: true
-          tags: ${{ fromJSON(needs.image.outputs.meta).tags }}
-          labels: ${{ fromJSON(needs.image.outputs.meta).labels }}
-          annotations: ${{ fromJSON(needs.image.outputs.meta).annotations }}
+          tags: ${{ needs.image.outputs.tags }}
+          labels: ${{ needs.image.outputs.labels }}
+          annotations: ${{ needs.image.outputs.annotations }}
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@v1
         with:
@@ -191,7 +194,7 @@ jobs:
 
   e2e-k3d:
     env:
-      K3D_NODE_IMAGE: localhost/k3d-node-image
+      K3D_NODE_IMAGE: ghcr.io/jakobmoellerdev/k3s:alpine-latest
     needs: image
     runs-on: ubuntu-latest
     steps:
@@ -208,7 +211,7 @@ jobs:
       - name: Create k3d cluster with Flannel
         run: |
           k3d cluster create \
-            --image ghcr.io/jakobmoellerdev/k3s:alpine-latest \
+            --image ${{ env.K3D_NODE_IMAGE }} \
             --k3s-arg "--disable=traefik@server:*" \
             --k3s-arg "--disable=servicelb@server:*" \
             --k3s-arg "--node-name=test-node"@server:0 \
