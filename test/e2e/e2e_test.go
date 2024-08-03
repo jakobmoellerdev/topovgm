@@ -95,7 +95,12 @@ var _ = Describe("controller", Ordered, func() {
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 			By("deploying the controller-manager")
-			cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage))
+			cmd = exec.Command(
+				"make",
+				"deploy",
+				fmt.Sprintf("IMG=%s", projectimage),
+				fmt.Sprintf("TARGET=%s", "local"),
+			)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
