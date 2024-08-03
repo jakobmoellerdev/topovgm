@@ -45,7 +45,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          outputs: type=docker,dest=/tmp/${{ env.IMAGE_ARTIFACT }}.tar
+          outputs: type=oci,dest=/tmp/${{ env.IMAGE_ARTIFACT }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
         env:
