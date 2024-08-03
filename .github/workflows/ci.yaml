@@ -277,4 +277,4 @@ jobs:
 
       - run: make test-e2e
         env:
-          IMAGE_NAME:${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          IMAGE_NAME: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
