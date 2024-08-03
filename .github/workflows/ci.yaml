@@ -27,6 +27,12 @@ jobs:
           - linux/s390x
           - linux/ppc64le
     steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Prepare
         run: |
           platform=${{ matrix.platform }}
@@ -79,6 +85,12 @@ jobs:
     needs:
       - image
     steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
