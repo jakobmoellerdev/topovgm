@@ -55,6 +55,7 @@ jobs:
           BUILDCACHE_SUFFIX=${{ matrix.platform }}
           BUILDCACHE_SUFFIX=${BUILDCACHE_SUFFIX//\//-}
           echo "BUILDCACHE_SUFFIX=${BUILDCACHE_SUFFIX}" >> $GITHUB_ENV
+
       - name: Build and export
         id: build
         uses: docker/build-push-action@v6
@@ -65,7 +66,7 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.BUILDCACHE_SUFFIX }}
-          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.BUILDCACHE_SUFFIX }},mode=max' || 'type=local,mode=max' }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.BUILDCACHE_SUFFIX }},mode=max' || 'type=inline' }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
