@@ -99,7 +99,6 @@ var _ = Describe("controller", Ordered, func() {
 				"make",
 				"deploy",
 				fmt.Sprintf("IMG=%s", projectimage),
-				fmt.Sprintf("TARGET=%s", "local"),
 			)
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
