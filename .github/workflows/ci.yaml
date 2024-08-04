@@ -20,7 +20,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-    runs-on: ubuntu-latest
+    runs-on: vs1-jakobmoeller-cloud-runner
+    container: ubuntu:latest
     strategy:
       fail-fast: false
       matrix:
