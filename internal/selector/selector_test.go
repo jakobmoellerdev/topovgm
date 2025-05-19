@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/azalio/lvm2go"
-	"github.com/topolvm/topovgm/api/v1alpha1"
-	"github.com/topolvm/topovgm/internal/lsblk"
+	"github.com/azalio/topovgm/api/v1alpha1"
+	"github.com/azalio/topovgm/internal/lsblk"
 )
 
 func TestDevicesMatchingSelector(t *testing.T) {

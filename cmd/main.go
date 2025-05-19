@@ -40,8 +40,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	topolvmv1alpha1 "github.com/topolvm/topovgm/api/v1alpha1"
-	"github.com/topolvm/topovgm/internal/controller"
+	topolvmv1alpha1 "github.com/azalio/topovgm/api/v1alpha1"
+	"github.com/azalio/topovgm/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

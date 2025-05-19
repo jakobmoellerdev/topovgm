@@ -1,4 +1,4 @@
-module github.com/topolvm/topovgm
+module github.com/azalio/topovgm
 
 go 1.22.5
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/azalio/lvm2go"
-	"github.com/topolvm/topovgm/internal/utils"
+	"github.com/azalio/topovgm/internal/utils"
 )
 
 // noNsenterCommandExecutor is a wrapper that ensures commands are executed without nsenter

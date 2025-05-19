@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/azalio/lvm2go"
-	"github.com/topolvm/topovgm/api/v1alpha1"
-	"github.com/topolvm/topovgm/internal/selector"
-	"github.com/topolvm/topovgm/internal/utils"
+	"github.com/azalio/topovgm/api/v1alpha1"
+	"github.com/azalio/topovgm/internal/selector"
+	"github.com/azalio/topovgm/internal/utils"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

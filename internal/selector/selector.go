@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/topolvm/topovgm/api/v1alpha1"
-	"github.com/topolvm/topovgm/internal/lsblk"
+	"github.com/azalio/topovgm/api/v1alpha1"
+	"github.com/azalio/topovgm/internal/lsblk"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )

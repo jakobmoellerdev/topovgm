@@ -21,17 +21,17 @@ import (
 	"errors"
 	"fmt"
 	"os/exec" // Kept for exec.ExitError, just in case
-	"strings"  // Added for strings.Contains
+	"strings" // Added for strings.Contains
 	"time"
 
 	"github.com/azalio/lvm2go"
+	"github.com/azalio/topovgm/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/topolvm/topovgm/api/v1alpha1"
+	// "github.com/topolvm/topovgm/api/v1alpha1"
 )
 
 const (
@@ -121,7 +121,7 @@ func (r *VolumeGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		var exitErr *exec.ExitError
 		foundExecExitError := errors.As(err, &exitErr)
 		logger.Info("Checked errors.As(err, &exitErr)", "foundExecExitError", foundExecExitError)
-		
+
 		isExitStatus5FromType := false
 		if foundExecExitError && exitErr.ProcessState != nil {
 			logger.Info("exec.ExitError found", "exitCode", exitErr.ProcessState.ExitCode())

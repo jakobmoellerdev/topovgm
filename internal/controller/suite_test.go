@@ -26,7 +26,7 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/topolvm/topovgm/test/utils"
+	"github.com/azalio/topovgm/test/utils"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,7 +34,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	topolvmv1alpha1 "github.com/topolvm/topovgm/api/v1alpha1"
+	topolvmv1alpha1 "github.com/azalio/topovgm/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

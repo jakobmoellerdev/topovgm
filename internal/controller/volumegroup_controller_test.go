@@ -30,7 +30,7 @@ import (
 	"github.com/azalio/lvm2go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/topolvm/topovgm/internal/lsblk"
+	"github.com/azalio/topovgm/internal/lsblk"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +38,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	topolvmv1alpha1 "github.com/topolvm/topovgm/api/v1alpha1"
+	topolvmv1alpha1 "github.com/azalio/topovgm/api/v1alpha1"
 )
 
 var _ = Describe("VolumeGroup Controller", func() {

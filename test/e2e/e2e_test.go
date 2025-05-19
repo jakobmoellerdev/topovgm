@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/topolvm/topovgm/test/utils"
+	"github.com/azalio/topovgm/test/utils"
 )
 
 const namespace = "topolvm-system"
