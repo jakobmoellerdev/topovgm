@@ -1,27 +1,21 @@
-apiVersion: v1
-items:
-- apiVersion: topolvm.io/v1alpha1
-  kind: VolumeGroup
-  metadata:
-    name: vg1
-    namespace: topolvm-system
-  spec:
-    allocationPolicy: normal
-    deviceLossSynchronizationPolicy: Fail
-    deviceRemovalVolumePolicy: MoveAndReduce
-    nodeName: talos-hk8-ou1
-    physicalExtentSize: 4Mi
-    physicalVolumeSelector:
-    - matchLSBLK:
-      - key: PATH
-        operator: In
-        values:
-        - /dev/sdb
-    tags:
-    - topovgm
-    zero: true
-  status:
-    name: ""
-kind: List
+apiVersion: topolvm.io/v1alpha1
+kind: VolumeGroup
 metadata:
-  resourceVersion: ""
+  name: vg1-talos-hk8-ou1
+  namespace: topolvm-system
+spec:
+  allocationPolicy: normal
+  deviceLossSynchronizationPolicy: Fail
+  deviceRemovalVolumePolicy: MoveAndReduce
+  nodeName: talos-hk8-ou1
+  nameOnNode: vg1
+  physicalExtentSize: 4Mi
+  physicalVolumeSelector:
+  - matchLSBLK:
+    - key: PATH
+      operator: In
+      values:
+      - /dev/sdb
+  tags:
+  - topovgm
+  zero: true
